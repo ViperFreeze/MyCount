@@ -10,7 +10,7 @@ Application web de suivi de budget personnel, en un seul fichier HTML, sans serv
 - **Épargne** : objectifs d'épargne avec échéance et versement mensuel suggéré, dépôts et retraits, et simulateur (fonds de départ, versement, durée, taux, dont Livret A) avec date d'atteinte prévue pour chaque objectif.
 - **Synchronisation** entre appareils par copier-coller d'une sauvegarde JSON, fusionnée sans doublons.
 
-Au premier lancement, l'appli démarre vide avec des catégories par défaut, à ajuster dans Budgets.
+Au premier lancement, l'appli démarre vide avec des catégories par défaut, à ajuster dans l'onglet Prélèvements.
 
 ## Utilisation
 
