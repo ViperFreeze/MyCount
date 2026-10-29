@@ -231,6 +231,10 @@ svg .v{fill:var(--ink);font-weight:500}
 .pot-sum{font-family:var(--f-display);font-stretch:80%;font-weight:700;font-size:26px;line-height:1}
 .pot-sum small{font-family:var(--f-body);font-stretch:100%;font-size:13px;font-weight:600;color:var(--muted);margin-left:4px}
 .bar span.save{background:var(--ok)}
+#sv-have{color:var(--ok)}
+#p-save .bar{margin-top:12px}
+.eta div.hit{color:var(--ok);font-weight:600}
+.eta div.hit b{color:var(--ok)}
 .pot-move{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .mini{width:84px;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--sunk);font-size:13px;min-height:30px}
 .sbtn.go{background:var(--ok);border-color:var(--ok);color:var(--surface);font-weight:600}
@@ -415,43 +419,29 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
 
   <section class="panel" id="p-save" role="tabpanel" aria-labelledby="t-save" hidden>
     <div class="box">
-      <div class="pot-head"><h2>Mes objectifs d'épargne</h2><span class="pot-sum num" id="pot-sum">0 €<small>de côté</small></span></div>
-      <p class="hint">Versez ou retirez au fil de l'eau : la barre montre où vous en êtes, et le montant à mettre de côté chaque mois pour tenir l'échéance.</p>
-      <div class="cats" id="pots"></div>
-    </div>
-    <form class="box" id="f-pot" novalidate>
-      <h2>Nouvel objectif</h2>
-      <div class="two">
-        <div class="field"><label for="p-name">Nom</label><input id="p-name" maxlength="40" placeholder="Ex. Nouvel ordi"></div>
-        <div class="field"><label for="p-target">Montant visé (€)</label><input id="p-target" inputmode="decimal" placeholder="900"></div>
-      </div>
-      <div class="field"><label for="p-deadline">Pour quand ? (facultatif)</label><input id="p-deadline" type="month"></div>
-      <div class="msg" id="p-msg" hidden></div>
-      <button class="secondary" type="submit">Créer l'objectif</button>
-    </form>
-    <div class="box" id="sim">
-      <h2>Simulation</h2>
-      <p class="hint">Et si je mettais de côté un peu chaque mois ? Faites varier les curseurs.</p>
-      <div class="tip" id="sim-tip" hidden><span id="sim-tip-t"></span><button type="button" id="sim-tip-b">Utiliser</button></div>
-      <div class="sim-in">
-        <div class="slide"><label for="s-month">Versement mensuel</label><output id="s-month-o" class="num" for="s-month">100 €</output><input type="range" id="s-month" min="0" max="1000" step="10" value="100"></div>
-        <div class="slide"><label for="s-years">Durée</label><output id="s-years-o" class="num" for="s-years">5 ans</output><input type="range" id="s-years" min="1" max="30" step="1" value="5"></div>
-        <div class="field"><span class="flabel">Taux annuel</span><div class="chips" id="s-rates"></div></div>
-        <div class="field"><label for="s-start">Fonds de départ (€)</label><input id="s-start" inputmode="decimal" autocomplete="off" placeholder="0"></div>
-        <div class="chips"><button type="button" class="dchip" id="s-use-saved"></button><button type="button" class="dchip" id="s-zero">Partir de zéro</button></div>
-      </div>
-      <div class="result">
-        <div class="big"><span class="done num" id="r-total">0 €</span><span class="of" id="r-when"></span></div>
-        <div class="figs">
-          <div class="fig"><span class="label">Versé</span><b class="num" id="r-in">0 €</b></div>
-          <div class="fig"><span class="label">Intérêts</span><b class="num" id="r-int">0 €</b></div>
-          <div class="fig"><span class="label">Gain</span><b class="num" id="r-pct">0 %</b></div>
+      <h2>Mon épargne</h2>
+      <div class="big"><span class="done num sv-have" id="sv-have">0 €</span><span class="of" id="sv-of"></span></div>
+      <div class="bar" id="sv-bar" hidden><span class="save" id="sv-fill"></span></div>
+      <p class="hint" id="sv-line"></p>
+      <button type="button" class="secondary" id="sv-open" aria-expanded="false">Modifier</button>
+      <form id="f-save" class="dform" hidden novalidate>
+        <div class="two">
+          <div class="field"><label for="sv-in-have">Ce que j'ai (€)</label><input id="sv-in-have" inputmode="decimal" placeholder="0"></div>
+          <div class="field"><label for="sv-in-target">Mon objectif (€)</label><input id="sv-in-target" inputmode="decimal" placeholder="3000"></div>
         </div>
-        <div class="chartwrap" id="r-chart"></div>
-        <div class="legend"><span><i class="a"></i>Ce que vous versez</span><span><i class="o"></i>Intérêts gagnés</span></div>
-        <div id="r-eta-box"><span class="label">Avec ce versement, chaque objectif serait atteint en</span><div class="eta" id="r-eta"></div></div>
-        <p class="fine">Simulation simplifiée : intérêts ajoutés chaque mois, taux constant, sans impôts ni plafond. Le Livret A rapporte 1,7 % depuis le 1er août 2026 (prochaine révision le 1er février 2027), net d'impôt, plafonné à 22 950 €.</p>
-      </div>
+        <div class="two">
+          <div class="field"><label for="sv-in-month">Prélèvement par mois (€)</label><input id="sv-in-month" inputmode="decimal" placeholder="100"></div>
+          <div class="field"><label for="sv-in-day">Jour du prélèvement (facultatif)</label><input id="sv-in-day" inputmode="numeric" maxlength="2" placeholder="5"></div>
+        </div>
+        <p class="fine">Le prélèvement d'épargne apparaît dans l'onglet Prélèvements et il est déduit de ce qui vous reste chaque mois.</p>
+        <div class="msg" id="sv-msg" hidden></div>
+        <button class="primary" type="submit">Enregistrer</button>
+      </form>
+    </div>
+    <div class="box">
+      <h2>Prévisions</h2>
+      <p class="hint" id="fc-sum"></p>
+      <div class="eta" id="fc"></div>
     </div>
   </section>
 
@@ -497,10 +487,12 @@ const WalletCore = (() => {
     const debits = (Array.isArray(d.debits) ? d.debits : [])
       .filter(x => x && typeof x.id === "string" && typeof x.name === "string" && x.name.trim() && cents(x.amount) > 0 && okYm(x.since))
       .map(x => ({ id: x.id, name: x.name.trim().slice(0, 40), amount: cents(x.amount), cat: typeof x.cat === "string" ? x.cat : "", day: Number.isInteger(x.day) && x.day >= 1 && x.day <= 31 ? x.day : 0, since: x.since, until: okYm(x.until) ? x.until : "", created: x.created || "", updated: x.updated || "" }));
+    const sv = d.saving && typeof d.saving === "object" ? d.saving : {};
+    const saving = { base: cents(sv.base) > 0 ? cents(sv.base) : 0, baseDate: okYmd(sv.baseDate) ? sv.baseDate : "", target: cents(sv.target) > 0 ? cents(sv.target) : 0, updated: typeof sv.updated === "string" ? sv.updated : "" };
     const inc = d.income && typeof d.income === "object" ? d.income : {};
     const income = { amount: cents(inc.amount) > 0 ? cents(inc.amount) : 0, updated: typeof inc.updated === "string" ? inc.updated : "" };
     return {
-      categories, debits, income,
+      categories, debits, income, saving,
       expenses: expenses.filter(e => !/^x\d+$/.test(e.id)),
       pots: pots.filter(p => !DEMO_POTS.includes(p.id)),
       moves: moves.filter(m => !/^m\d+$/.test(m.id) && !DEMO_POTS.includes(m.pot)),
@@ -540,7 +532,8 @@ const WalletCore = (() => {
       return [...m.values()].filter(it => !deleted[it.id]);
     };
     const income = b.income.updated > a.income.updated ? b.income : a.income;
-    const merged = { categories: union(a.categories, b.categories), debits: union(a.debits, b.debits), income, expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted };
+    const saving = b.saving.updated > a.saving.updated ? b.saving : a.saving;
+    const merged = { categories: union(a.categories, b.categories), debits: union(a.debits, b.debits), income, saving, expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted };
     const all = s => [...s.expenses, ...s.categories, ...s.debits, ...s.pots, ...s.moves];
     const aIds = new Set(all(a).map(x => x.id));
     const added = all(merged).filter(x => !aIds.has(x.id)).length;
@@ -608,7 +601,7 @@ if (typeof document !== "undefined") (function () {
     const t = nowIso();
     const cats = [["logement", "Logement", 45000], ["courses", "Courses", 22000], ["transport", "Transport", 4500], ["sorties", "Sorties", 8000], ["abos", "Abonnements", 2500], ["shopping", "Shopping", 6000], ["sante", "Santé", 2000]]
       .map(([id, name, budget], i) => ({ id, name, budget, order: i, created: t, updated: t }));
-    return { categories: cats, debits: [], income: { amount: 0, updated: "" }, expenses: [], pots: [], moves: [], deleted: {} };
+    return { categories: cats, debits: [], income: { amount: 0, updated: "" }, saving: { base: 0, baseDate: "", target: 0, updated: "" }, expenses: [], pots: [], moves: [], deleted: {} };
   }
 
   /* ---------- Stockage ---------- */
@@ -628,6 +621,12 @@ if (typeof document !== "undefined") (function () {
   }
 
   let state = load();
+  // Anciens objectifs d'épargne : on reprend ce qui est de côté et le montant visé.
+  if (!state.saving.updated && state.pots.length) {
+    const b = potBalances(state);
+    state.saving = { base: state.pots.reduce((s, p) => s + Math.max(0, b[p.id] || 0), 0), baseDate: ymd(new Date()), target: state.pots.reduce((s, p) => s + p.target, 0), updated: nowIso() };
+    try { localStorage.setItem(LS, JSON.stringify(state)); } catch (e) {}
+  }
   const todayYm = () => ymOf(new Date());
   let view = todayYm();
   let selCat = "";
@@ -708,109 +707,64 @@ if (typeof document !== "undefined") (function () {
     renderSavings();
   }
 
-  /* ---------- Épargne ---------- */
-  let editPot = "";
-  const monthsUntil = ym => { const [y, m] = ym.split("-").map(Number), n = new Date(); return (y - n.getFullYear()) * 12 + (m - 1 - n.getMonth()) + 1; };
-  const ymLabel = ym => { const [y, m] = ym.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "short", year: "numeric" }).replace(".", ""); };
-  const savedTotal = () => { const b = potBalances(state); return state.pots.reduce((s, p) => s + Math.max(0, b[p.id] || 0), 0); };
+  /* ---------- Épargne : un prélèvement mensuel (identifiant fixe « epargne ») ---------- */
+  const SAVE_ID = "epargne";
+  const saveDebit = () => state.debits.find(d => d.id === SAVE_ID);
+  const ymLabel = ym => { const [y, m] = ym.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }); };
+  // Date du prélèvement d'épargne pour un mois donné (jour choisi, ou le 1er).
+  const debitDate = (d, ym) => `${ym}-${pad(Math.min(d.day || 1, daysIn(ym)))}`;
+  const saveActive = (d, ym) => d && d.since <= ym && (!d.until || ym <= d.until);
 
+  /* Ce que j'ai = montant indiqué + prélèvements passés depuis. */
+  function savedNow() {
+    const sv = state.saving, d = saveDebit(), today = ymd(new Date());
+    let bal = sv.base;
+    if (d) for (let ym = d.since; ym <= todayYm(); ym = ymShift(ym, 1)) {
+      const dt = debitDate(d, ym);
+      if (saveActive(d, ym) && dt <= today && (!sv.baseDate || dt > sv.baseDate)) bal += d.amount;
+    }
+    return bal;
+  }
+
+  /* Prévisions : un point par prélèvement à venir, jusqu'à l'objectif. */
+  function forecast() {
+    const sv = state.saving, d = saveDebit(), today = ymd(new Date()), rows = [];
+    let bal = savedNow();
+    if (!d || !sv.target || bal >= sv.target) return { rows, bal };
+    for (let ym = todayYm(), i = 0; i < 600 && bal < sv.target; ym = ymShift(ym, 1), i++) {
+      if (!saveActive(d, ym)) { if (d.until && ym > d.until) break; continue; }
+      const dt = debitDate(d, ym);
+      if (dt <= today || (sv.baseDate && dt <= sv.baseDate)) continue;
+      bal += d.amount; rows.push({ ym, bal });
+    }
+    return { rows, bal };
+  }
+
+  let svEdit = false;
   function renderSavings() {
-    const bal = potBalances(state);
-    $("#pot-sum").innerHTML = `${eurR(savedTotal())}<small>de côté</small>`;
-    $("#pots").innerHTML = state.pots.map(p => {
-      const s = Math.max(0, bal[p.id] || 0), miss = p.target - s, w = Math.min(100, s / p.target * 100);
-      let line;
-      if (miss <= 0) line = `<b style="color:var(--ok)">Objectif atteint</b>`;
-      else if (p.deadline) {
-        const n = monthsUntil(p.deadline);
-        line = n >= 1 ? `Il manque ${eur(miss)} · <b style="color:var(--ink)">${eur(Math.ceil(miss / n / 100) * 100)} / mois</b> pour ${ymLabel(p.deadline)}` : `Échéance passée · il manque ${eur(miss)}`;
-      } else line = `Il manque ${eur(miss)}`;
-      const edit = editPot === p.id ? `
-        <form class="cat-edit pot-edit" data-pedit="${p.id}">
-          <div class="field"><label for="pe-n-${p.id}">Nom</label><input id="pe-n-${p.id}" value="${esc(p.name)}" maxlength="40"></div>
-          <div class="field"><label for="pe-t-${p.id}">Visé (€)</label><input id="pe-t-${p.id}" inputmode="decimal" value="${String(p.target / 100).replace(".", ",")}"></div>
-          <div class="field"><label for="pe-d-${p.id}">Pour quand</label><input id="pe-d-${p.id}" type="month" value="${p.deadline}"></div>
-          <div class="row"><button type="button" class="sbtn del" data-pdel="${p.id}">Supprimer</button><span class="row"><button type="button" class="sbtn" data-pcancel>Annuler</button><button class="sbtn" type="submit" style="font-weight:600">Enregistrer</button></span></div>
-        </form>` : "";
-      return `<div class="cat">
-        <div class="cat-top"><span class="cat-name">${esc(p.name)}</span><span class="cat-left num">${eur(s)}<small style="margin:0 0 0 4px">/ ${eur(p.target)}</small></span></div>
-        <div class="bar"><span class="save" style="width:${w}%"></span></div>
-        <div class="cat-foot"><span>${line}</span></div>
-        <div class="cat-foot"><span class="pot-move"><input class="mini num" id="pm-${p.id}" inputmode="decimal" placeholder="€" aria-label="Montant pour ${esc(p.name)}"><button type="button" class="sbtn go" data-in="${p.id}">Verser</button><button type="button" class="sbtn" data-out="${p.id}">Retirer</button></span>
-          <button type="button" class="sbtn" data-pedit-open="${p.id}">Modifier</button></div>
-        ${edit}</div>`;
-    }).join("") || `<p class="empty">Aucun objectif pour l'instant. Créez-en un ci-dessous : un fonds d'urgence, le permis, un voyage…</p>`;
-    renderSim();
-  }
+    const sv = state.saving, d = saveDebit(), have = savedNow();
+    const on = d && !(d.until && d.until < todayYm());
+    $("#sv-have").textContent = eur(have);
+    $("#sv-of").textContent = sv.target ? `sur ${eur(sv.target)}` : "";
+    $("#sv-bar").hidden = !sv.target;
+    $("#sv-fill").style.width = sv.target ? Math.min(100, have / sv.target * 100) + "%" : "0";
+    $("#sv-line").textContent = on ? `+ ${eur(d.amount)} prélevés ${d.day ? "le " + d.day : "le 1er"} de chaque mois.` : "Pas encore de prélèvement d'épargne.";
+    const empty = !d && !sv.base && !sv.target, open = svEdit || empty;
+    $("#f-save").hidden = !open; $("#sv-open").hidden = empty;
+    $("#sv-open").textContent = open ? "Fermer" : "Modifier"; $("#sv-open").setAttribute("aria-expanded", String(open));
 
-  /* Simulation : réglages propres à ce navigateur */
-  const RATES = [[0, "Sans intérêts"], [1.7, "Livret A 1,7 %"], [3, "3 %"], [5, "5 %"]];
-  // start : fonds de départ en centimes ; absent = épargne actuelle.
-  let sim = { monthly: 10000, years: 5, rate: 1.7 };
-  try { const r = JSON.parse(localStorage.getItem(LS + "-sim") || "null"); if (r) { sim = { ...sim, ...r }; if (r.from === false && !Number.isFinite(r.start)) sim.start = 0; delete sim.from; } } catch (e) {}
-  const saveSim = () => { try { localStorage.setItem(LS + "-sim", JSON.stringify(sim)); } catch (e) {} };
-
-  /* Marge moyenne des 3 derniers mois terminés (objectif − dépensé), pour suggérer un versement réaliste. */
-  function avgMargin() {
-    const ms = [1, 2, 3].map(k => ymShift(todayYm(), -k)).map(m => monthTotals(state, m)).filter(t => t.count > 0 && t.income > 0);
-    if (!ms.length) return 0;
-    const avg = ms.reduce((s, t) => s + (t.income - t.total), 0) / ms.length;
-    return Math.max(0, Math.floor(avg / 1000) * 1000);
-  }
-
-  function renderSim() {
-    $("#s-month").value = sim.monthly / 100; $("#s-month-o").textContent = eur(sim.monthly);
-    $("#s-years").value = sim.years; $("#s-years-o").textContent = sim.years + (sim.years > 1 ? " ans" : " an");
-    $("#s-rates").innerHTML = RATES.map(([v, l]) => `<button type="button" class="dchip" data-rate="${v}" aria-pressed="${v === sim.rate}">${l}</button>`).join("");
-    const saved = savedTotal();
-    const start = Number.isFinite(sim.start) ? sim.start : saved;
-    if (document.activeElement !== $("#s-start")) $("#s-start").value = start ? String(start / 100).replace(".", ",") : "";
-    $("#s-use-saved").textContent = `Mon épargne actuelle : ${eurR(saved)}`;
-    $("#s-use-saved").setAttribute("aria-pressed", String(start === saved && saved > 0));
-    $("#s-zero").setAttribute("aria-pressed", String(start === 0));
-    const mg = avgMargin();
-    $("#sim-tip").hidden = !(mg > 0 && mg !== sim.monthly);
-    $("#sim-tip-t").textContent = `Ces derniers mois, il vous restait en moyenne ${eurR(mg)} par mois.`;
-    $("#sim-tip-b").textContent = `Simuler ${eurR(mg)} / mois`; $("#sim-tip-b").dataset.v = mg;
-
-    const N = sim.years * 12;
-    const pts = simulate(start, sim.monthly, sim.rate, N), end = pts[N];
-    const endDate = new Date(); endDate.setMonth(endDate.getMonth() + N);
-    $("#r-total").textContent = eurR(end.bal);
-    $("#r-when").textContent = `dans ${sim.years} an${sim.years > 1 ? "s" : ""} (${endDate.toLocaleDateString("fr-FR", { month: "short", year: "numeric" }).replace(".", "")})`;
-    $("#r-in").textContent = eurR(end.paid);
-    $("#r-int").textContent = "+" + eurR(end.bal - end.paid);
-    $("#r-pct").textContent = end.paid ? "+" + nf0.format((end.bal - end.paid) / end.paid * 100) + " %" : "–";
-
-    // Aires empilées : versé (bleu) + intérêts (vert), un point par mois
-    const W = 600, H = 200, L = 52, R = 12, Tp = 12, B = 26;
-    const max = Math.max(end.bal, 1) * 1.08, step = niceStep(max / 4);
-    const x = m => L + (W - L - R) * m / N, y = v => Tp + (H - Tp - B) * (1 - v / max);
-    const path = (key, base) => {
-      const top = pts.map(p => `${x(p.m).toFixed(1)},${y(p[key]).toFixed(1)}`).join(" L");
-      const bot = base ? pts.slice().reverse().map(p => `${x(p.m).toFixed(1)},${y(p[base]).toFixed(1)}`).join(" L") : `${x(N)},${y(0)} L${x(0)},${y(0)}`;
-      return `M${top} L${bot} Z`;
-    };
-    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:380px" role="img" aria-label="Évolution de l'épargne simulée">`;
-    for (let g = 0; g <= max; g += step) svg += `<line class="g" x1="${L}" x2="${W - R}" y1="${y(g)}" y2="${y(g)}"/><text x="${L - 6}" y="${y(g) + 4}" text-anchor="end">${g >= 100000 ? nf0.format(g / 100000) + " k" : nf0.format(g / 100)}</text>`;
-    svg += `<path class="ac" d="${path("paid")}"/><path class="ai" d="${path("bal", "paid")}"/>`;
-    const every = sim.years <= 6 ? 1 : sim.years <= 15 ? 3 : 5;
-    for (let yr = 0; yr <= sim.years; yr += every) svg += `<text x="${x(yr * 12)}" y="${H - 8}" text-anchor="${yr === 0 ? "start" : yr === sim.years ? "end" : "middle"}">${yr === 0 ? "auj." : yr + " an" + (yr > 1 ? "s" : "")}</text>`;
-    $("#r-chart").innerHTML = svg + "</svg>";
-
-    // Délai pour chaque objectif si tout le versement y était consacré
-    const bal = potBalances(state);
-    const rows = state.pots.map(p => {
-      const s = Math.max(0, bal[p.id] || 0), n = monthsToReach(s, sim.monthly, sim.rate, p.target);
-      let v;
-      if (n === 0) v = "déjà atteint";
-      else if (!isFinite(n)) v = "jamais à ce rythme";
-      else { const d = new Date(); d.setMonth(d.getMonth() + n); v = `${n} mois · ${d.toLocaleDateString("fr-FR", { month: "short", year: "numeric" }).replace(".", "")}`; }
-      const late = p.deadline && isFinite(n) && n > monthsUntil(p.deadline) && n > 0;
-      return `<div><span>${esc(p.name)}</span><b style="${late ? "color:var(--warn)" : ""}">${v}${late ? " (après l'échéance)" : ""}</b></div>`;
-    });
-    $("#r-eta-box").hidden = !rows.length;
-    $("#r-eta").innerHTML = rows.join("");
+    // Prévisions
+    const fc = forecast(), sum = $("#fc-sum"), box = $("#fc");
+    if (!sv.target) { sum.textContent = "Indiquez votre objectif pour voir, mois par mois, quand vous l'atteindrez."; box.innerHTML = ""; return; }
+    if (have >= sv.target) { sum.innerHTML = `<b style="color:var(--ok)">Objectif atteint</b> : vous avez ${eur(have)} pour ${eur(sv.target)} visés.`; box.innerHTML = ""; return; }
+    if (!on) { sum.textContent = `Il manque ${eur(sv.target - have)}. Ajoutez un prélèvement mensuel pour voir les prévisions.`; box.innerHTML = ""; return; }
+    const last = fc.rows[fc.rows.length - 1];
+    if (!last || last.bal < sv.target) { sum.textContent = `Il manque ${eur(sv.target - have)} : à ce rythme, l'objectif n'est pas atteint.`; }
+    else sum.innerHTML = `Objectif atteint en <b>${ymLabel(last.ym)}</b>, dans ${fc.rows.length} mois.`;
+    box.innerHTML = fc.rows.map((r, i) => {
+      const done = r.bal >= sv.target;
+      return `<div${done ? ' class="hit"' : ""}><span>${ymLabel(r.ym)}</span><b>${eur(r.bal)}${done ? " · objectif atteint" : ""}</b></div>`;
+    }).join("");
   }
 
   function renderCats() {
@@ -829,8 +783,10 @@ if (typeof document !== "undefined") (function () {
     const list = activeDebits(state, view), cats = sorted();
     const total = list.reduce((s, d) => s + d.amount, 0);
     $("#d-sum").innerHTML = `${eur(total)}<small>par mois</small>`;
-    const groups = cats.map(c => [c.id, c.name]).concat([["", "Hors catégorie"]]).map(([id, name]) => {
-      const ds = list.filter(d => id ? d.cat === id : !cats.some(c => c.id === d.cat)).sort((a, b) => (a.day || 99) - (b.day || 99) || a.name.localeCompare(b.name, "fr"));
+    const sd = list.find(d => d.id === SAVE_ID);
+    const saveGroup = sd ? `<div class="dgroup"><div class="cat-top"><span class="cat-name">Épargne</span><span class="amt num">${eur(sd.amount)}</span></div><div class="drow"><span class="dday">${sd.day ? "le " + sd.day : ""}</span><span class="dname">Vers mon épargne</span><span class="amt num">${eur(sd.amount)}</span><button type="button" class="sbtn" data-gosave>Modifier</button></div></div>` : "";
+    const groups = saveGroup + cats.map(c => [c.id, c.name]).concat([["", "Hors catégorie"]]).map(([id, name]) => {
+      const ds = list.filter(d => d.id !== SAVE_ID && (id ? d.cat === id : !cats.some(c => c.id === d.cat))).sort((a, b) => (a.day || 99) - (b.day || 99) || a.name.localeCompare(b.name, "fr"));
       if (!ds.length) return "";
       const sum = ds.reduce((s, d) => s + d.amount, 0);
       return `<div class="dgroup"><div class="cat-top"><span class="cat-name">${esc(name)}</span><span class="amt num">${eur(sum)}</span></div>` + ds.map(d => {
@@ -889,7 +845,7 @@ if (typeof document !== "undefined") (function () {
     const prev = monthTotals(state, ymShift(view, -1));
     // Répartition : prélèvements par catégorie, dépenses par libellé
     const acc = {}, addTo = (k, v) => { acc[k] = (acc[k] || 0) + v; };
-    for (const d of activeDebits(state, view)) addTo(catName(d.cat), d.amount);
+    for (const d of activeDebits(state, view)) addTo(d.id === SAVE_ID ? "Épargne" : catName(d.cat), d.amount);
     for (const e of state.expenses) if (e.date.slice(0, 7) === view) addTo(e.note || catName(e.cat), e.amount);
     const parts = Object.entries(acc).filter(p => p[1] > 0).sort((a, b) => b[1] - a[1]);
     const top = parts[0];
@@ -1016,61 +972,43 @@ if (typeof document !== "undefined") (function () {
   $("#l-filter-x").addEventListener("click", () => { filterCat = ""; render(); });
 
   /* ---------- Épargne : actions ---------- */
-  $("#pots").addEventListener("click", e => {
-    const b = e.target.closest("button"); if (!b) return;
-    if (b.dataset.peditOpen) { editPot = editPot === b.dataset.peditOpen ? "" : b.dataset.peditOpen; renderSavings(); return; }
-    if (b.dataset.pcancel !== undefined) { editPot = ""; renderSavings(); return; }
-    const id = b.dataset.in || b.dataset.out;
-    if (id) {
-      const p = state.pots.find(x => x.id === id), a = parseAmount($(`#pm-${id}`).value);
-      if (!a) { toast("Indiquez un montant à côté du bouton, par exemple 50."); $(`#pm-${id}`).focus(); return; }
-      const have = Math.max(0, potBalances(state)[id] || 0);
-      if (b.dataset.out && a > have) { toast(`Il n'y a que ${eur(have)} dans « ${p.name} ».`); return; }
-      const t = nowIso(), mv = { id: "m" + uid(), pot: id, date: ymd(new Date()), amount: b.dataset.in ? a : -a, created: t, updated: t };
-      state.moves.push(mv); save(); render();
-      toast(b.dataset.in ? `${eur(a)} versés sur « ${p.name} »` : `${eur(a)} retirés de « ${p.name} »`, "Annuler", () => { state.moves = state.moves.filter(m => m.id !== mv.id); state.deleted[mv.id] = nowIso(); save(); render(); });
-      return;
-    }
-    if (b.dataset.pdel) {
-      if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer"; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = "Supprimer"; } }, 3000); return; }
-      const p = state.pots.find(x => x.id === b.dataset.pdel), gone = state.moves.filter(m => m.pot === p.id), t = nowIso();
-      state.pots = state.pots.filter(x => x.id !== p.id); state.moves = state.moves.filter(m => m.pot !== p.id);
-      state.deleted[p.id] = t; gone.forEach(m => state.deleted[m.id] = t); editPot = ""; save(); render();
-      toast(`« ${p.name} » supprimé`, "Annuler", () => { const u = nowIso(); [p, ...gone].forEach(x => { delete state.deleted[x.id]; x.updated = u; }); state.pots.push(p); state.moves.push(...gone); save(); render(); });
-    }
-  });
-  $("#pots").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches(".mini")) { e.preventDefault(); const id = e.target.id.slice(3); $(`[data-in="${id}"]`).click(); } });
-  $("#pots").addEventListener("submit", e => {
+  const fillSave = () => {
+    const d = saveDebit(), sv = state.saving, f = v => v ? String(v / 100).replace(".", ",") : "";
+    $("#sv-in-have").value = f(savedNow()); $("#sv-in-target").value = f(sv.target);
+    $("#sv-in-month").value = d && !(d.until && d.until < todayYm()) ? f(d.amount) : ""; $("#sv-in-day").value = d && d.day ? d.day : "";
+    $("#sv-msg").hidden = true;
+  };
+  $("#sv-open").addEventListener("click", () => { svEdit = !svEdit; if (svEdit) fillSave(); renderSavings(); if (svEdit) $("#sv-in-have").focus(); });
+  $("#f-save").addEventListener("submit", e => {
     e.preventDefault();
-    const f = e.target.closest("form[data-pedit]"); if (!f) return;
-    const p = state.pots.find(x => x.id === f.dataset.pedit);
-    const name = $(`#pe-n-${p.id}`).value.trim(), target = parseAmount($(`#pe-t-${p.id}`).value), dl = $(`#pe-d-${p.id}`).value;
-    if (!name || !target) { toast("Indiquez un nom et un montant visé en euros."); return; }
-    p.name = name; p.target = target; p.deadline = /^\d{4}-\d{2}$/.test(dl) ? dl : ""; p.updated = nowIso(); editPot = ""; save(); render();
-    toast(`« ${name} » mis à jour`);
-  });
-  $("#f-pot").addEventListener("submit", e => {
-    e.preventDefault();
-    const name = $("#p-name").value.trim(), target = parseAmount($("#p-target").value), dl = $("#p-deadline").value, m = $("#p-msg");
-    if (!name) { m.hidden = false; m.textContent = "Donnez un nom à l'objectif."; return; }
-    if (!target) { m.hidden = false; m.textContent = "Indiquez le montant visé en euros, par exemple 900."; return; }
-    if (dl && !/^\d{4}-\d{2}$/.test(dl)) { m.hidden = false; m.textContent = "Choisissez un mois pour l'échéance, ou laissez vide."; return; }
-    if (dl && dl < todayYm()) { m.hidden = false; m.textContent = "L'échéance est déjà passée : choisissez un mois à venir."; return; }
+    const m = $("#sv-msg"), raw = id => $(id).value.trim();
+    const zero = v => /^0+([,.]0*)?$/.test(v);
+    const have = raw("#sv-in-have") === "" || zero(raw("#sv-in-have")) ? 0 : parseAmount(raw("#sv-in-have"));
+    const target = raw("#sv-in-target") === "" ? 0 : parseAmount(raw("#sv-in-target"));
+    const monthly = raw("#sv-in-month") === "" || zero(raw("#sv-in-month")) ? 0 : parseAmount(raw("#sv-in-month"));
+    const rawDay = raw("#sv-in-day"), day = parseDay(rawDay);
+    const err = t => { m.hidden = false; m.textContent = t; };
+    if (raw("#sv-in-have") && !have && !zero(raw("#sv-in-have"))) return err("Indiquez ce que vous avez en euros, par exemple 500.");
+    if (raw("#sv-in-target") && !target) return err("Indiquez votre objectif en euros, par exemple 3000.");
+    if (raw("#sv-in-month") && !monthly && !zero(raw("#sv-in-month"))) return err("Indiquez le prélèvement mensuel en euros, par exemple 100.");
+    if (rawDay && !day) return err("Le jour doit être un nombre entre 1 et 31, ou laissez vide.");
     m.hidden = true;
-    const t = nowIso();
-    state.pots.push({ id: "p" + uid(), name, target, deadline: dl || "", created: t, updated: t });
-    $("#p-name").value = ""; $("#p-target").value = ""; $("#p-deadline").value = ""; save(); render();
-    toast(`Objectif « ${name} » créé. Versez un premier montant !`);
+    const t = nowIso(), ym = todayYm();
+    state.saving = { base: have, baseDate: ymd(new Date()), target, updated: t };
+    let d = saveDebit();
+    if (monthly) {
+      if (!d) { d = { id: SAVE_ID, name: "Épargne", amount: monthly, cat: "", day, since: ym, until: "", created: t, updated: t }; state.debits.push(d); delete state.deleted[SAVE_ID]; }
+      else {
+        if (d.until && d.until < ym) d.since = ym;
+        d.amount = monthly; d.day = day; d.until = ""; d.updated = t;
+      }
+    } else if (d && !(d.until && d.until < ym)) {
+      if (d.since < ym) { d.until = ymShift(ym, -1); d.updated = t; }
+      else { state.debits = state.debits.filter(x => x.id !== SAVE_ID); state.deleted[SAVE_ID] = t; }
+    }
+    svEdit = false; save(); render();
+    toast(monthly ? `Épargne : ${eur(monthly)} prélevés chaque mois` : "Épargne mise à jour");
   });
-
-  /* Simulation : contrôles */
-  $("#s-month").addEventListener("input", e => { sim.monthly = Number(e.target.value) * 100; saveSim(); renderSim(); });
-  $("#s-years").addEventListener("input", e => { sim.years = Number(e.target.value); saveSim(); renderSim(); });
-  $("#s-rates").addEventListener("click", e => { const b = e.target.closest("[data-rate]"); if (!b) return; sim.rate = Number(b.dataset.rate); saveSim(); renderSim(); });
-  $("#s-start").addEventListener("input", e => { const v = e.target.value.trim(); sim.start = v === "" || v === "0" ? 0 : parseAmount(v); saveSim(); renderSim(); });
-  $("#s-use-saved").addEventListener("click", () => { sim.start = savedTotal(); saveSim(); renderSim(); });
-  $("#s-zero").addEventListener("click", () => { sim.start = 0; saveSim(); renderSim(); });
-  $("#sim-tip-b").addEventListener("click", e => { sim.monthly = Math.min(100000, Number(e.target.dataset.v)); saveSim(); renderSim(); });
 
   /* ---------- Revenus ---------- */
   $("#income-edit").addEventListener("click", () => { openDrawer(true); $("#set-income").focus(); });
@@ -1105,6 +1043,7 @@ if (typeof document !== "undefined") (function () {
   });
   $("#debits").addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.gosave !== undefined) { setTab("save"); svEdit = true; fillSave(); renderSavings(); $("#sv-in-month").focus(); return; }
     if (b.dataset.dedit) { editDebit = editDebit === b.dataset.dedit ? "" : b.dataset.dedit; renderDebits(); return; }
     if (b.dataset.dcancel !== undefined) { editDebit = ""; renderDebits(); return; }
     if (b.dataset.ddel) {
