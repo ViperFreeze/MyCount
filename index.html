@@ -56,7 +56,6 @@ button,input,select,textarea{font:inherit;color:inherit}
 .brand{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .brand .mark{width:20px;height:20px;flex:none;background:var(--ink);-webkit-mask:url(icons/logo-mark.png) center/contain no-repeat;mask:url(icons/logo-mark.png) center/contain no-repeat}
 .brand .word{font-family:var(--f-display);font-weight:700;font-stretch:115%;font-size:13px;letter-spacing:.16em;text-transform:uppercase}
-.brand .ver{font-family:var(--f-mono);font-size:10px;font-weight:600;letter-spacing:.04em;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:2px 7px}
 
 .banner{display:flex;gap:12px;align-items:center;justify-content:space-between;background:var(--accent-soft);border-radius:12px;padding:10px 14px;font-size:14px;flex-wrap:wrap}
 
@@ -81,6 +80,22 @@ button,input,select,textarea{font:inherit;color:inherit}
 .gauge{position:relative;height:16px;border-radius:6px;background:var(--sunk);border:1px solid var(--line);overflow:visible}
 .gauge .f{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--accent)}
 .gauge .f.warn{background:var(--warn)} .gauge .f.bad{background:var(--danger)}
+.gauge .fd{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--ink);opacity:.28}
+.left-label{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:-10px}
+.income{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.income b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
+.income-form{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}
+.dgroup{display:flex;flex-direction:column;gap:2px;padding:12px 0;border-top:1px solid var(--line)}
+.dgroup:first-child{border-top:0;padding-top:2px}
+.dgroup .cat-top{margin-bottom:4px}
+.drow{display:grid;grid-template-columns:40px 1fr auto auto;gap:10px;align-items:center;padding:5px 0;font-size:14px}
+.dday{font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase}
+.dname{overflow-wrap:anywhere;min-width:0}
+.dform{display:flex;flex-direction:column;gap:12px}
+.field select{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surface);min-height:42px;color:var(--ink);font:inherit}
+.dedit{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--sunk);border-radius:10px;padding:10px;margin:4px 0}
+.dedit .field input{background:var(--surface)}
+.dedit .row{grid-column:1/-1;justify-content:space-between}
 .gauge .t{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--ink);border-radius:1px}
 .scale{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-top:-8px;gap:8px}
 .figs{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
@@ -227,7 +242,7 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
   <section class="card" aria-labelledby="h-month">
     <div class="card-head">
       <div style="min-width:0">
-        <div class="brand"><span class="mark" aria-hidden="true"></span><span class="word">MyCount</span><span class="ver" title="Version de l'appli">v2</span></div>
+        <div class="brand"><span class="mark" aria-hidden="true"></span><span class="word">MyCount</span></div>
         <div class="month">
           <button class="arrow" id="m-prev" aria-label="Mois précédent">‹</button>
           <h1 id="h-month">octobre 2026</h1>
@@ -255,25 +270,31 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
       <div class="msg" id="x-msg" hidden></div>
     </div>
 
-    <div class="big"><span class="done num" id="f-left">0 €</span><span class="of num" id="f-of">restants sur 0 €</span><span class="chip" id="f-status"></span></div>
-    <div class="gauge" aria-hidden="true"><div class="f" id="g-fill"></div><div class="t" id="g-today"></div></div>
-    <div class="scale"><span id="sc-a">0 €</span><span id="sc-b"></span></div>
+    <div class="left-label">Il vous reste ce mois-ci</div>
+    <div class="big"><span class="done num" id="f-left">–</span><span class="chip" id="f-status" hidden></span></div>
+    <div class="income" id="income-view"><span id="income-t"></span><button type="button" class="sbtn" id="income-edit">Modifier</button></div>
+    <form class="income-form" id="income-form" hidden novalidate>
+      <div class="field"><label for="income-in">Vos revenus par mois (salaire, bourse, aides…)</label><input id="income-in" inputmode="decimal" placeholder="1 200"></div>
+      <button class="primary" type="submit">Enregistrer</button>
+    </form>
+    <div class="gauge" aria-hidden="true"><div class="fd" id="g-debit"></div><div class="f" id="g-fill"></div></div>
+    <div class="scale"><span id="sc-a"></span><span id="sc-b"></span></div>
     <div class="figs">
-      <div class="fig"><span class="label">Dépensé</span><b class="num" id="k-spent">0 €</b></div>
-      <div class="fig"><span class="label" id="k-left-l">Reste</span><b class="num" id="k-left">0 €</b></div>
+      <div class="fig"><span class="label">Prélèvements</span><b class="num" id="k-debits">0 €</b></div>
+      <div class="fig"><span class="label">Dépenses</span><b class="num" id="k-spent">0 €</b></div>
       <div class="fig"><span class="label" id="k-day-l">Par jour</span><b class="num" id="k-day">–</b></div>
     </div>
     <div class="pace" id="pace"></div>
   </section>
 
   <nav class="tabs" role="tablist" aria-label="Sections">
-    <button class="tab" role="tab" id="t-budgets" aria-controls="p-budgets" aria-selected="true">Budgets</button>
-    <button class="tab" role="tab" id="t-log" aria-controls="p-log" aria-selected="false">Dépenses</button>
+    <button class="tab" role="tab" id="t-log" aria-controls="p-log" aria-selected="true">Mois</button>
+    <button class="tab" role="tab" id="t-budgets" aria-controls="p-budgets" aria-selected="false">Budgets</button>
     <button class="tab" role="tab" id="t-save" aria-controls="p-save" aria-selected="false">Épargne</button>
     <button class="tab" role="tab" id="t-stats" aria-controls="p-stats" aria-selected="false">Stats</button>
   </nav>
 
-  <section class="panel" id="p-budgets" role="tabpanel" aria-labelledby="t-budgets">
+  <section class="panel" id="p-budgets" role="tabpanel" aria-labelledby="t-budgets" hidden>
     <div class="box">
       <h2>Ce qui reste par catégorie</h2>
       <p class="hint">Le trait vertical marque où vous devriez en être aujourd'hui pour finir le mois pile dans l'objectif.</p>
@@ -291,7 +312,23 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
     </form>
   </section>
 
-  <section class="panel" id="p-log" role="tabpanel" aria-labelledby="t-log" hidden>
+  <section class="panel" id="p-log" role="tabpanel" aria-labelledby="t-log">
+    <div class="box" id="debits-box">
+      <div class="pot-head"><h2>Prélèvements</h2><span class="pot-sum num" id="d-sum">0 €<small>par mois</small></span></div>
+      <p class="hint">Ce qui part tout seul chaque mois : loyer, forfait, abonnements… C'est déduit automatiquement de ce qui vous reste.</p>
+      <div class="cats" id="debits"></div>
+      <button type="button" class="secondary" id="d-open" aria-expanded="false">Ajouter un prélèvement</button>
+      <form id="f-debit" class="dform" hidden novalidate>
+        <div class="two">
+          <div class="field"><label for="d-name">Nom</label><input id="d-name" maxlength="40" placeholder="Ex. Loyer"></div>
+          <div class="field"><label for="d-amount">Montant (€)</label><input id="d-amount" inputmode="decimal" placeholder="450"></div>
+        </div>
+        <div class="field"><label for="d-day">Jour du prélèvement (facultatif)</label><input id="d-day" inputmode="numeric" maxlength="2" placeholder="5"></div>
+        <div class="field"><span class="flabel">Catégorie</span><div class="chips" id="d-cats" role="group" aria-label="Catégorie du prélèvement"></div></div>
+        <div class="msg" id="d-msg" hidden></div>
+        <button class="primary" type="submit">Ajouter le prélèvement</button>
+      </form>
+    </div>
     <form class="box" id="f-exp" novalidate>
       <h2>Nouvelle dépense</h2>
       <div class="field amount"><label for="e-amount">Montant</label><input id="e-amount" inputmode="decimal" autocomplete="off" placeholder="0,00"><span>€</span></div>
@@ -390,8 +427,14 @@ const WalletCore = (() => {
       .map(m => ({ id: m.id, pot: m.pot, date: m.date, amount: cents(m.amount), created: m.created || "", updated: m.updated || "" }));
     // Anciennes données d'exemple : identifiants fixes (x0, x1…, m0, m1…, pots d'exemple). Les saisies réelles ont des identifiants aléatoires.
     const DEMO_POTS = ["urgence", "permis", "voyage"];
+    const okYm = s => typeof s === "string" && /^\d{4}-\d{2}$/.test(s);
+    const debits = (Array.isArray(d.debits) ? d.debits : [])
+      .filter(x => x && typeof x.id === "string" && typeof x.name === "string" && x.name.trim() && cents(x.amount) > 0 && okYm(x.since))
+      .map(x => ({ id: x.id, name: x.name.trim().slice(0, 40), amount: cents(x.amount), cat: typeof x.cat === "string" ? x.cat : "", day: Number.isInteger(x.day) && x.day >= 1 && x.day <= 31 ? x.day : 0, since: x.since, until: okYm(x.until) ? x.until : "", created: x.created || "", updated: x.updated || "" }));
+    const inc = d.income && typeof d.income === "object" ? d.income : {};
+    const income = { amount: cents(inc.amount) > 0 ? cents(inc.amount) : 0, updated: typeof inc.updated === "string" ? inc.updated : "" };
     return {
-      categories,
+      categories, debits, income,
       expenses: expenses.filter(e => !/^x\d+$/.test(e.id)),
       pots: pots.filter(p => !DEMO_POTS.includes(p.id)),
       moves: moves.filter(m => !/^m\d+$/.test(m.id) && !DEMO_POTS.includes(m.pot)),
@@ -430,8 +473,9 @@ const WalletCore = (() => {
       for (const it of [...x, ...y]) { const cur = m.get(it.id); if (!cur || stamp(it) > stamp(cur)) m.set(it.id, it); }
       return [...m.values()].filter(it => !deleted[it.id]);
     };
-    const merged = { categories: union(a.categories, b.categories), expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted };
-    const all = s => [...s.expenses, ...s.categories, ...s.pots, ...s.moves];
+    const income = b.income.updated > a.income.updated ? b.income : a.income;
+    const merged = { categories: union(a.categories, b.categories), debits: union(a.debits, b.debits), income, expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted };
+    const all = s => [...s.expenses, ...s.categories, ...s.debits, ...s.pots, ...s.moves];
     const aIds = new Set(all(a).map(x => x.id));
     const added = all(merged).filter(x => !aIds.has(x.id)).length;
     const removed = all(a).filter(x => deleted[x.id]).length;
@@ -451,26 +495,30 @@ const WalletCore = (() => {
     return normalize(obj.data);
   }
 
-  /* Totaux d'un mois : dépensé par catégorie, hors catégorie, objectif total. */
+  /* Prélèvements en cours pour un mois donné (depuis leur création, jusqu'à leur arrêt éventuel). */
+  const activeDebits = (state, ym) => state.debits.filter(d => d.since <= ym && (!d.until || ym <= d.until));
+
+  /* Totaux d'un mois : prélèvements + dépenses, par catégorie, et ce qu'il reste sur les revenus. */
   function monthTotals(state, ym) {
-    const by = {}; let total = 0, orphan = 0, count = 0;
+    const by = {}; let spent = 0, debits = 0, orphan = 0, count = 0;
     const known = new Set(state.categories.map(c => c.id));
+    const put = (cat, v) => { if (known.has(cat)) by[cat] = (by[cat] || 0) + v; else orphan += v; };
     for (const e of state.expenses) {
       if (e.date.slice(0, 7) !== ym) continue;
-      total += e.amount; count++;
-      if (known.has(e.cat)) by[e.cat] = (by[e.cat] || 0) + e.amount; else orphan += e.amount;
+      spent += e.amount; count++; put(e.cat, e.amount);
     }
+    for (const d of activeDebits(state, ym)) { debits += d.amount; put(d.cat, d.amount); }
     const budget = state.categories.reduce((s, c) => s + c.budget, 0);
-    return { by, total, orphan, budget, count };
+    return { by, total: spent + debits, spent, debits, orphan, budget, count, income: state.income.amount };
   }
 
-  return { normalize, merge, exportPayload, parseImport, monthTotals, potBalances, simulate, monthsToReach };
+  return { normalize, merge, exportPayload, parseImport, monthTotals, activeDebits, potBalances, simulate, monthsToReach };
 })();
 if (typeof module !== "undefined") module.exports = WalletCore;
 
 if (typeof document !== "undefined") (function () {
   "use strict";
-  const { normalize, merge, exportPayload, parseImport, monthTotals, potBalances, simulate, monthsToReach } = WalletCore;
+  const { normalize, merge, exportPayload, parseImport, monthTotals, activeDebits, potBalances, simulate, monthsToReach } = WalletCore;
   const LS = "mywallet-v1";
   const $ = s => document.querySelector(s);
   const pad = n => String(n).padStart(2, "0");
@@ -494,7 +542,7 @@ if (typeof document !== "undefined") (function () {
     const t = nowIso();
     const cats = [["logement", "Logement", 45000], ["courses", "Courses", 22000], ["transport", "Transport", 4500], ["sorties", "Sorties", 8000], ["abos", "Abonnements", 2500], ["shopping", "Shopping", 6000], ["sante", "Santé", 2000]]
       .map(([id, name, budget], i) => ({ id, name, budget, order: i, created: t, updated: t }));
-    return { categories: cats, expenses: [], pots: [], moves: [], deleted: {} };
+    return { categories: cats, debits: [], income: { amount: 0, updated: "" }, expenses: [], pots: [], moves: [], deleted: {} };
   }
 
   /* ---------- Stockage ---------- */
@@ -519,6 +567,9 @@ if (typeof document !== "undefined") (function () {
   let selCat = "";
   let editing = "";
   let filterCat = "";
+  let editDebit = "";
+  let selDebitCat = "";
+  let incomeOpen = false;
 
   /* ---------- Toast ---------- */
   let toastT;
@@ -551,42 +602,50 @@ if (typeof document !== "undefined") (function () {
 
   function render() {
     const T = monthTotals(state, view), tm = timing(view);
-    const left = T.budget - T.total;
+    const left = T.income - T.total;
+    const mon = monthName(view).split(" ")[0];
     $("#h-month").textContent = monthName(view);
     $("#m-next").disabled = view >= ymShift(todayYm(), 1);
-
-    // Synthèse
     $("#h-sub").textContent = tm.kind === "current" ? `Jour ${tm.elapsed} sur ${tm.dim} · ${T.count} dépense${T.count > 1 ? "s" : ""}` : tm.kind === "past" ? `Mois terminé · ${T.count} dépense${T.count > 1 ? "s" : ""}` : "Mois à venir";
-    const fl = $("#f-left");
-    fl.textContent = (left < 0 ? "−" : "") + eurR(Math.abs(left));
-    fl.classList.toggle("neg", left < 0);
-    $("#f-of").textContent = left < 0 ? `de dépassement sur ${eurR(T.budget)}` : `${tm.kind === "past" ? "économisés" : "restants"} sur ${eurR(T.budget)}`;
-    const lv = level(T.total, T.budget, tm.frac);
-    const st = $("#f-status");
-    st.className = "chip " + lv;
-    st.textContent = lv === "bad" ? "Budget dépassé" : lv === "warn" ? (tm.kind === "current" ? "Rythme élevé" : "Tout juste") : (tm.kind === "future" ? "Pas commencé" : "Dans les clous");
-    const pct = T.budget ? Math.min(100, T.total / T.budget * 100) : (T.total ? 100 : 0);
-    const gf = $("#g-fill"); gf.style.width = pct + "%"; gf.className = "f" + (lv === "ok" ? "" : " " + lv);
-    const gt = $("#g-today"); gt.hidden = tm.kind !== "current"; gt.style.left = `calc(${tm.frac * 100}% - 1px)`;
-    $("#sc-a").textContent = `${eurR(T.total)} dépensés`;
-    $("#sc-b").textContent = tm.kind === "current" ? `aujourd'hui : ${eurR(T.budget * tm.frac)} prévus` : eurR(T.budget);
-    $("#k-spent").textContent = eurR(T.total);
-    $("#k-left-l").textContent = left < 0 ? "Dépassement" : "Reste";
-    $("#k-left").textContent = eurR(Math.abs(left));
-    if (tm.kind === "current") { $("#k-day-l").textContent = "Par jour restant"; $("#k-day").textContent = left > 0 ? eur(Math.floor(left / tm.daysLeft)) : "0 €"; }
-    else if (tm.kind === "past") { $("#k-day-l").textContent = "Moyenne / jour"; $("#k-day").textContent = eur(Math.round(T.total / tm.dim)); }
-    else { $("#k-day-l").textContent = "Par jour"; $("#k-day").textContent = eur(Math.floor(T.budget / tm.dim)); }
+
+    // Ce qui reste = revenus − prélèvements − dépenses
+    const has = T.income > 0, fl = $("#f-left"), st = $("#f-status");
+    $(".left-label").textContent = tm.kind === "past" ? `Il vous est resté en ${mon}` : tm.kind === "future" ? `Il vous restera en ${mon}, avant dépenses` : "Il vous reste ce mois-ci";
+    fl.textContent = has ? (left < 0 ? "−" : "") + eurR(Math.abs(left)) : "–";
+    fl.classList.toggle("neg", has && left < 0);
+    const proj = tm.kind === "current" && T.spent > 0 ? T.income - T.debits - Math.round(T.spent / tm.elapsed * tm.dim) : left;
+    const lv = !has ? "" : left < 0 ? "bad" : proj < 0 ? "warn" : "ok";
+    st.hidden = !has; st.className = "chip " + lv;
+    st.textContent = lv === "bad" ? "Dans le rouge" : lv === "warn" ? "Rythme trop élevé" : tm.kind === "future" ? "Prévision" : "Ça va";
+    $("#income-t").innerHTML = has ? `Revenus du mois : <b>${eur(T.income)}</b>` : "Indiquez vos revenus pour savoir ce qui vous reste.";
+    $("#income-edit").textContent = has ? "Modifier" : "Indiquer";
+    $("#income-form").hidden = !(incomeOpen || !has);
+    $("#income-edit").hidden = !has;
+
+    const base = Math.max(T.income, T.total, 1);
+    const wd = T.debits / base * 100, we = T.spent / base * 100;
+    $("#g-debit").style.width = Math.min(100, wd) + "%";
+    const gf = $("#g-fill"); gf.style.left = Math.min(100, wd) + "%"; gf.style.width = Math.max(0, Math.min(100 - wd, we)) + "%";
+    gf.className = "f" + (lv === "bad" ? " bad" : lv === "warn" ? " warn" : "");
+    $("#sc-a").textContent = has ? `${nf0.format(Math.round(T.total / T.income * 100))} % des revenus utilisés` : `${eurR(T.total)} sortis`;
+    $("#sc-b").textContent = has ? eurR(T.income) : "";
+    $("#k-debits").textContent = eurR(T.debits);
+    $("#k-spent").textContent = eurR(T.spent);
+    if (tm.kind === "current") { $("#k-day-l").textContent = "Par jour restant"; $("#k-day").textContent = has ? (left > 0 ? eur(Math.floor(left / tm.daysLeft)) : "0 €") : "–"; }
+    else if (tm.kind === "past") { $("#k-day-l").textContent = "Dépenses / jour"; $("#k-day").textContent = eur(Math.round(T.spent / tm.dim)); }
+    else { $("#k-day-l").textContent = "Par jour"; $("#k-day").textContent = has && left > 0 ? eur(Math.floor(left / tm.dim)) : "–"; }
+
     let pace = "";
-    if (tm.kind === "current" && T.total > 0) {
-      const proj = Math.round(T.total / tm.elapsed * tm.dim);
-      pace = proj > T.budget
-        ? `À ce rythme, le mois finira vers <b>${eurR(proj)}</b>, soit <b>${eurR(proj - T.budget)}</b> au-dessus de l'objectif.`
-        : `À ce rythme, le mois finira vers <b>${eurR(proj)}</b> : il resterait <b>${eurR(T.budget - proj)}</b>.`;
-    } else if (tm.kind === "past") {
-      pace = left >= 0 ? `Mois bouclé avec <b>${eurR(left)}</b> de marge.` : `Mois bouclé avec <b>${eurR(-left)}</b> de dépassement.`;
-    } else if (tm.kind === "future") pace = `Objectif total prévu : <b>${eurR(T.budget)}</b>.`;
+    if (!has) pace = "MyCount déduit vos prélèvements et vos dépenses de vos revenus pour afficher ce qu'il vous reste.";
+    else if (tm.kind === "current" && T.spent > 0) pace = proj >= 0
+      ? `À ce rythme de dépenses, il vous resterait environ <b>${eurR(proj)}</b> fin ${mon}.`
+      : `À ce rythme de dépenses, vous finiriez ${mon} à <b>−${eurR(-proj)}</b>.`;
+    else if (tm.kind === "current") pace = `Pas encore de dépense ce mois-ci : après vos prélèvements, il vous reste <b>${eurR(left)}</b>.`;
+    else if (tm.kind === "past") pace = left >= 0 ? `Mois bouclé avec <b>${eurR(left)}</b> de côté.` : `Mois bouclé avec <b>${eurR(-left)}</b> de dépassement.`;
+    else pace = `Prélèvements prévus : <b>${eurR(T.debits)}</b>.`;
     $("#pace").innerHTML = pace;
 
+    renderDebits();
     renderCats(T, tm);
     renderForm();
     renderList();
@@ -639,7 +698,7 @@ if (typeof document !== "undefined") (function () {
   function avgMargin() {
     const ms = [1, 2, 3].map(k => ymShift(todayYm(), -k)).map(m => monthTotals(state, m)).filter(t => t.count > 0);
     if (!ms.length) return 0;
-    const avg = ms.reduce((s, t) => s + (t.budget - t.total), 0) / ms.length;
+    const avg = ms.reduce((s, t) => s + ((t.income || t.budget) - t.total), 0) / ms.length;
     return Math.max(0, Math.floor(avg / 1000) * 1000);
   }
 
@@ -651,7 +710,7 @@ if (typeof document !== "undefined") (function () {
     $("#s-from").checked = sim.from; $("#s-from-t").textContent = `Partir de mon épargne actuelle (${eurR(saved)})`;
     const mg = avgMargin();
     $("#sim-tip").hidden = !(mg > 0 && mg !== sim.monthly);
-    $("#sim-tip-t").textContent = `Ces derniers mois, il vous restait en moyenne ${eurR(mg)} sur vos budgets.`;
+    $("#sim-tip-t").textContent = `Ces derniers mois, il vous restait en moyenne ${eurR(mg)} par mois.`;
     $("#sim-tip-b").textContent = `Simuler ${eurR(mg)} / mois`; $("#sim-tip-b").dataset.v = mg;
 
     const start = sim.from ? saved : 0, N = sim.years * 12;
@@ -720,6 +779,31 @@ if (typeof document !== "undefined") (function () {
     $("#cats-total").textContent = eur(T.budget);
   }
 
+  function renderDebits() {
+    const list = activeDebits(state, view), cats = sorted();
+    const total = list.reduce((s, d) => s + d.amount, 0);
+    $("#d-sum").innerHTML = `${eur(total)}<small>par mois</small>`;
+    const groups = cats.map(c => [c.id, c.name]).concat([["", "Hors catégorie"]]).map(([id, name]) => {
+      const ds = list.filter(d => id ? d.cat === id : !cats.some(c => c.id === d.cat)).sort((a, b) => (a.day || 99) - (b.day || 99) || a.name.localeCompare(b.name, "fr"));
+      if (!ds.length) return "";
+      const sum = ds.reduce((s, d) => s + d.amount, 0);
+      return `<div class="dgroup"><div class="cat-top"><span class="cat-name">${esc(name)}</span><span class="amt num">${eur(sum)}</span></div>` + ds.map(d => {
+        const row = `<div class="drow"><span class="dday">${d.day ? "le " + d.day : ""}</span><span class="dname">${esc(d.name)}</span><span class="amt num">${eur(d.amount)}</span><button type="button" class="sbtn" data-dedit="${d.id}">Modifier</button></div>`;
+        if (editDebit !== d.id) return row;
+        return row + `<form class="dedit" data-dform="${d.id}">
+          <div class="field"><label for="de-n-${d.id}">Nom</label><input id="de-n-${d.id}" value="${esc(d.name)}" maxlength="40"></div>
+          <div class="field"><label for="de-a-${d.id}">Montant (€)</label><input id="de-a-${d.id}" inputmode="decimal" value="${String(d.amount / 100).replace(".", ",")}"></div>
+          <div class="field"><label for="de-d-${d.id}">Jour</label><input id="de-d-${d.id}" inputmode="numeric" maxlength="2" value="${d.day || ""}"></div>
+          <div class="field"><label for="de-c-${d.id}">Catégorie</label><select id="de-c-${d.id}">${cats.map(c => `<option value="${c.id}"${c.id === d.cat ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div>
+          <div class="row"><button type="button" class="sbtn del" data-ddel="${d.id}">${d.since < view ? "Arrêter" : "Supprimer"}</button><span class="row"><button type="button" class="sbtn" data-dcancel>Annuler</button><button class="sbtn" type="submit" style="font-weight:600">Enregistrer</button></span></div>
+        </form>`;
+      }).join("") + `</div>`;
+    }).join("");
+    $("#debits").innerHTML = groups || `<p class="empty">Aucun prélèvement. Ajoutez votre loyer, votre forfait, vos abonnements…</p>`;
+    if (!cats.find(c => c.id === selDebitCat)) selDebitCat = cats[0] ? cats[0].id : "";
+    $("#d-cats").innerHTML = cats.map(c => `<button type="button" class="dchip" data-dcat="${c.id}" aria-pressed="${c.id === selDebitCat}">${esc(c.name)}</button>`).join("") || `<span class="empty">Créez d'abord une catégorie dans l'onglet Budgets.</span>`;
+  }
+
   function renderForm() {
     const cats = sorted();
     if (!cats.find(c => c.id === selCat)) selCat = cats[0] ? cats[0].id : "";
@@ -753,7 +837,7 @@ if (typeof document !== "undefined") (function () {
     const diff = prev.total ? Math.round((T.total - prev.total) / prev.total * 100) : null;
     const days = tm.kind === "current" ? tm.elapsed : tm.dim;
     const kp = [
-      [eurR(T.total), "dépensés ce mois"],
+      [eurR(T.total), "sortis ce mois (prélèvements compris)"],
       [tm.kind === "future" ? "–" : eur(Math.round(T.total / Math.max(1, days))), "en moyenne par jour"],
       [diff === null ? "–" : (diff > 0 ? "+" : "") + diff + " %", `vs ${monthName(ymShift(view, -1)).split(" ")[0]} (${eurR(prev.total)})`],
       [top ? esc(catName(top[0])) : "–", top ? `plus gros poste · ${eur(top[1])}` : "plus gros poste"]
@@ -787,14 +871,14 @@ if (typeof document !== "undefined") (function () {
   function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw))); const n = raw / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
 
   /* ---------- Onglets ---------- */
-  const tabs = ["budgets", "log", "save", "stats"];
+  const tabs = ["log", "budgets", "save", "stats"];
   function setTab(t) {
     tabs.forEach(k => { $("#t-" + k).setAttribute("aria-selected", String(k === t)); $("#p-" + k).hidden = k !== t; });
-    try { localStorage.setItem(LS + "-tab", t); } catch (e) {}
+    try { localStorage.setItem(LS + "-tab2", t); } catch (e) {}
   }
   tabs.forEach(k => $("#t-" + k).addEventListener("click", () => setTab(k)));
-  let startTab = "budgets"; try { startTab = localStorage.getItem(LS + "-tab") || "budgets"; } catch (e) {}
-  setTab(tabs.includes(startTab) ? startTab : "budgets");
+  let startTab = "log"; try { startTab = localStorage.getItem(LS + "-tab2") || "log"; } catch (e) {}
+  setTab(tabs.includes(startTab) ? startTab : "log");
 
   /* ---------- Mois ---------- */
   function setMonth(ym) {
@@ -865,6 +949,7 @@ if (typeof document !== "undefined") (function () {
     $("#e-amount").value = ""; $("#e-note").value = "";
     render();
     const T = monthTotals(state, ym), left = c.budget - (T.by[c.id] || 0);
+    if (T.income) { const r = T.income - T.total; toast(r >= 0 ? `${eur(amount)} ajoutés · il vous reste ${eur(r)} ce mois-ci` : `${eur(amount)} ajoutés · vous êtes à −${eur(-r)} ce mois-ci`); return; }
     toast(left >= 0 ? `${eur(amount)} ajoutés · il reste ${eur(left)} en ${c.name}` : `${eur(amount)} ajoutés · ${c.name} dépasse de ${eur(-left)}`);
   });
   $("#list").addEventListener("click", e => {
@@ -931,7 +1016,69 @@ if (typeof document !== "undefined") (function () {
   $("#s-from").addEventListener("change", e => { sim.from = e.target.checked; saveSim(); renderSim(); });
   $("#sim-tip-b").addEventListener("click", e => { sim.monthly = Math.min(100000, Number(e.target.dataset.v)); saveSim(); renderSim(); });
 
-  /* ---------- Exemples ---------- */
+  /* ---------- Revenus ---------- */
+  $("#income-edit").addEventListener("click", () => {
+    incomeOpen = !incomeOpen; render();
+    if (incomeOpen) { const i = $("#income-in"); i.value = String(state.income.amount / 100).replace(".", ","); i.focus(); }
+  });
+  $("#income-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const a = parseAmount($("#income-in").value);
+    if (!a) { toast("Indiquez vos revenus en euros, par exemple 1200."); $("#income-in").focus(); return; }
+    state.income = { amount: a, updated: nowIso() }; incomeOpen = false; $("#income-in").value = ""; save(); render();
+    toast(`Revenus : ${eur(a)} par mois`);
+  });
+
+  /* ---------- Prélèvements ---------- */
+  const parseDay = s => { const v = Number(String(s).trim()); return Number.isInteger(v) && v >= 1 && v <= 31 ? v : 0; };
+  $("#d-open").addEventListener("click", () => {
+    const f = $("#f-debit"); f.hidden = !f.hidden;
+    $("#d-open").setAttribute("aria-expanded", String(!f.hidden)); $("#d-open").textContent = f.hidden ? "Ajouter un prélèvement" : "Fermer";
+    if (!f.hidden) $("#d-name").focus();
+  });
+  $("#d-cats").addEventListener("click", e => { const b = e.target.closest("[data-dcat]"); if (!b) return; selDebitCat = b.dataset.dcat; renderDebits(); });
+  $("#f-debit").addEventListener("submit", e => {
+    e.preventDefault();
+    const name = $("#d-name").value.trim(), amount = parseAmount($("#d-amount").value), rawDay = $("#d-day").value.trim(), day = parseDay(rawDay), m = $("#d-msg");
+    if (!name) { m.hidden = false; m.textContent = "Donnez un nom au prélèvement, par exemple Loyer."; return; }
+    if (!amount) { m.hidden = false; m.textContent = "Indiquez le montant en euros, par exemple 450."; return; }
+    if (rawDay && !day) { m.hidden = false; m.textContent = "Le jour doit être un nombre entre 1 et 31, ou laissez vide."; return; }
+    if (!selDebitCat) { m.hidden = false; m.textContent = "Créez d'abord une catégorie dans l'onglet Budgets."; return; }
+    m.hidden = true;
+    const t = nowIso();
+    state.debits.push({ id: "d" + uid(), name, amount, cat: selDebitCat, day, since: view, until: "", created: t, updated: t });
+    $("#d-name").value = ""; $("#d-amount").value = ""; $("#d-day").value = ""; save(); render();
+    toast(`« ${name} » : ${eur(amount)} chaque mois`);
+  });
+  $("#debits").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.dedit) { editDebit = editDebit === b.dataset.dedit ? "" : b.dataset.dedit; renderDebits(); return; }
+    if (b.dataset.dcancel !== undefined) { editDebit = ""; renderDebits(); return; }
+    if (b.dataset.ddel) {
+      const label = b.textContent;
+      if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer"; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = label; } }, 3000); return; }
+      const d = state.debits.find(x => x.id === b.dataset.ddel); editDebit = "";
+      if (d.since < view) {
+        // Déjà prélevé les mois précédents : on l'arrête à partir de ce mois, l'historique reste juste.
+        const before = d.until; d.until = ymShift(view, -1); d.updated = nowIso(); save(); render();
+        toast(`« ${d.name} » arrêté à partir de ${monthName(view).split(" ")[0]}`, "Annuler", () => { d.until = before; d.updated = nowIso(); save(); render(); });
+      } else {
+        state.debits = state.debits.filter(x => x.id !== d.id); state.deleted[d.id] = nowIso(); save(); render();
+        toast(`« ${d.name} » supprimé`, "Annuler", () => { delete state.deleted[d.id]; d.updated = nowIso(); state.debits.push(d); save(); render(); });
+      }
+    }
+  });
+  $("#debits").addEventListener("submit", e => {
+    e.preventDefault();
+    const f = e.target.closest("form[data-dform]"); if (!f) return;
+    const d = state.debits.find(x => x.id === f.dataset.dform);
+    const name = $(`#de-n-${d.id}`).value.trim(), amount = parseAmount($(`#de-a-${d.id}`).value), rawDay = $(`#de-d-${d.id}`).value.trim(), day = parseDay(rawDay);
+    if (!name || !amount) { toast("Indiquez un nom et un montant en euros."); return; }
+    if (rawDay && !day) { toast("Le jour doit être un nombre entre 1 et 31, ou vide."); return; }
+    d.name = name; d.amount = amount; d.day = day; d.cat = $(`#de-c-${d.id}`).value; d.updated = nowIso(); editDebit = ""; save(); render();
+    toast(`« ${name} » mis à jour`);
+  });
+
 
   /* ---------- Synchronisation ---------- */
   $("#btn-sync").addEventListener("click", () => { const s = $("#syncbox"); s.hidden = !s.hidden; $("#btn-sync").setAttribute("aria-expanded", String(!s.hidden)); });
