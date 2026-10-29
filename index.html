@@ -289,7 +289,7 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
     <div class="figs">
       <div class="fig"><span class="label">Prélèvements</span><b class="num" id="k-debits">0 €</b></div>
       <div class="fig"><span class="label">Dépenses</span><b class="num" id="k-spent">0 €</b></div>
-      <div class="fig"><span class="label" id="k-day-l">Par jour</span><b class="num" id="k-day">–</b></div>
+      <div class="fig"><span class="label" id="k-day-l">Après prélèv.</span><b class="num" id="k-day">–</b></div>
     </div>
     <div class="pace" id="pace"></div>
   </section>
@@ -632,9 +632,9 @@ if (typeof document !== "undefined") (function () {
     $("#sc-b").textContent = has ? eurR(T.income) : "";
     $("#k-debits").textContent = eurR(T.debits);
     $("#k-spent").textContent = eurR(T.spent);
-    if (tm.kind === "current") { $("#k-day-l").textContent = "Par jour restant"; $("#k-day").textContent = has ? (left > 0 ? eur(Math.floor(left / tm.daysLeft)) : "0 €") : "–"; }
-    else if (tm.kind === "past") { $("#k-day-l").textContent = "Dépenses / jour"; $("#k-day").textContent = eur(Math.round(T.spent / tm.dim)); }
-    else { $("#k-day-l").textContent = "Par jour"; $("#k-day").textContent = has && left > 0 ? eur(Math.floor(left / tm.dim)) : "–"; }
+    // Revenus − prélèvements : ce qu'il reste pour les dépenses du mois
+    const afterDebits = T.income - T.debits;
+    $("#k-day").textContent = has ? (afterDebits < 0 ? "−" : "") + eurR(Math.abs(afterDebits)) : "–";
 
     let pace = "";
     if (!has) pace = "MyCount déduit vos prélèvements et vos dépenses de vos revenus pour afficher ce qu'il vous reste.";
