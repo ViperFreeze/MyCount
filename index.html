@@ -192,6 +192,9 @@ textarea{width:100%;min-height:84px;padding:10px 11px;border:1px solid var(--lin
 .cat-edit{display:grid;grid-template-columns:1fr 110px;gap:8px;background:var(--sunk);border-radius:10px;padding:10px}
 .cat-edit .field input{background:var(--surface)}
 .cat-edit .row{grid-column:1/-1;justify-content:space-between}
+.cat-left small.ok{color:var(--ok)}
+.goal-edit{grid-template-columns:1fr 120px}
+@media (max-width:420px){.goal-edit{grid-template-columns:1fr}}
 .total{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
 .total b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
 
@@ -410,6 +413,21 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
       <div class="msg" id="e-msg" hidden></div>
       <button class="primary" type="submit" id="e-submit">Ajouter</button>
     </form>
+    <div class="box" id="goals-box">
+      <div class="pot-head"><h2>Objectifs de dépenses</h2><span class="pot-sum num" id="go-sum"></span></div>
+      <p class="hint">Un plafond par mois pour un libellé : chaque dépense saisie avec ce libellé (Essence, Nourriture…) y est comptée.</p>
+      <div class="cats" id="goals"></div>
+      <button type="button" class="secondary" id="go-open" aria-expanded="false">Ajouter un objectif</button>
+      <form id="f-goal" class="dform" hidden novalidate>
+        <div class="two">
+          <div class="field"><label for="go-name">Libellé</label><input id="go-name" maxlength="80" placeholder="Ex. Essence" autocomplete="off"></div>
+          <div class="field"><label for="go-amount">Plafond par mois (€)</label><input id="go-amount" inputmode="decimal" placeholder="100" autocomplete="off"></div>
+        </div>
+        <div class="chips" id="go-labels" aria-label="Suggestions de libellé"></div>
+        <div class="msg" id="go-msg" hidden></div>
+        <button class="primary" type="submit">Ajouter l'objectif</button>
+      </form>
+    </div>
     <div class="box">
       <h2 id="l-title">Dépenses du mois</h2>
       <div class="filter" id="l-filter" hidden><span id="l-filter-t"></span><button type="button" class="sbtn" id="l-filter-x">Tout afficher</button></div>
@@ -487,12 +505,16 @@ const WalletCore = (() => {
     const debits = (Array.isArray(d.debits) ? d.debits : [])
       .filter(x => x && typeof x.id === "string" && typeof x.name === "string" && x.name.trim() && cents(x.amount) > 0 && okYm(x.since))
       .map(x => ({ id: x.id, name: x.name.trim().slice(0, 40), amount: cents(x.amount), cat: typeof x.cat === "string" ? x.cat : "", day: Number.isInteger(x.day) && x.day >= 1 && x.day <= 31 ? x.day : 0, since: x.since, until: okYm(x.until) ? x.until : "", created: x.created || "", updated: x.updated || "" }));
+    // Objectifs de dépenses : un plafond mensuel par libellé (ex. Essence 100 €).
+    const goals = (Array.isArray(d.goals) ? d.goals : [])
+      .filter(g => g && typeof g.id === "string" && typeof g.name === "string" && g.name.trim() && cents(g.amount) > 0)
+      .map(g => ({ id: g.id, name: g.name.trim().slice(0, 80), amount: cents(g.amount), created: g.created || "", updated: g.updated || "" }));
     const sv = d.saving && typeof d.saving === "object" ? d.saving : {};
     const saving = { base: cents(sv.base) > 0 ? cents(sv.base) : 0, baseDate: okYmd(sv.baseDate) ? sv.baseDate : "", target: cents(sv.target) > 0 ? cents(sv.target) : 0, updated: typeof sv.updated === "string" ? sv.updated : "" };
     const inc = d.income && typeof d.income === "object" ? d.income : {};
     const income = { amount: cents(inc.amount) > 0 ? cents(inc.amount) : 0, updated: typeof inc.updated === "string" ? inc.updated : "" };
     return {
-      categories, debits, income, saving,
+      categories, debits, income, saving, goals,
       expenses: expenses.filter(e => !/^x\d+$/.test(e.id)),
       pots: pots.filter(p => !DEMO_POTS.includes(p.id)),
       moves: moves.filter(m => !/^m\d+$/.test(m.id) && !DEMO_POTS.includes(m.pot)),
@@ -533,8 +555,8 @@ const WalletCore = (() => {
     };
     const income = b.income.updated > a.income.updated ? b.income : a.income;
     const saving = b.saving.updated > a.saving.updated ? b.saving : a.saving;
-    const merged = { categories: union(a.categories, b.categories), debits: union(a.debits, b.debits), income, saving, expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted };
-    const all = s => [...s.expenses, ...s.categories, ...s.debits, ...s.pots, ...s.moves];
+    const merged = { categories: union(a.categories, b.categories), debits: union(a.debits, b.debits), income, saving, goals: union(a.goals, b.goals), expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted };
+    const all = s => [...s.expenses, ...s.categories, ...s.debits, ...s.goals, ...s.pots, ...s.moves];
     const aIds = new Set(all(a).map(x => x.id));
     const added = all(merged).filter(x => !aIds.has(x.id)).length;
     const removed = all(a).filter(x => deleted[x.id]).length;
@@ -571,13 +593,25 @@ const WalletCore = (() => {
     return { by, total: spent + debits, spent, debits, orphan, budget, count, income: state.income.amount };
   }
 
-  return { normalize, merge, exportPayload, parseImport, monthTotals, activeDebits, potBalances, simulate, monthsToReach };
+  /* Objectifs de dépenses : ce qui est dépensé dans le mois sous chaque libellé (sans tenir compte des majuscules). */
+  const labelKey = s => String(s || "").trim().toLocaleLowerCase("fr");
+  function goalSpent(state, ym) {
+    const by = {}, idx = {};
+    for (const g of state.goals) { idx[labelKey(g.name)] = g.id; by[g.id] = 0; }
+    for (const e of state.expenses) {
+      if (e.date.slice(0, 7) !== ym) continue;
+      const id = idx[labelKey(e.note)]; if (id) by[id] += e.amount;
+    }
+    return by;
+  }
+
+  return { normalize, merge, exportPayload, parseImport, monthTotals, activeDebits, potBalances, simulate, monthsToReach, goalSpent, labelKey };
 })();
 if (typeof module !== "undefined") module.exports = WalletCore;
 
 if (typeof document !== "undefined") (function () {
   "use strict";
-  const { normalize, merge, exportPayload, parseImport, monthTotals, activeDebits, potBalances, simulate, monthsToReach } = WalletCore;
+  const { normalize, merge, exportPayload, parseImport, monthTotals, activeDebits, potBalances, simulate, monthsToReach, goalSpent, labelKey } = WalletCore;
   const LS = "mywallet-v1";
   const $ = s => document.querySelector(s);
   const pad = n => String(n).padStart(2, "0");
@@ -601,7 +635,7 @@ if (typeof document !== "undefined") (function () {
     const t = nowIso();
     const cats = [["logement", "Logement", 45000], ["courses", "Courses", 22000], ["transport", "Transport", 4500], ["sorties", "Sorties", 8000], ["abos", "Abonnements", 2500], ["shopping", "Shopping", 6000], ["sante", "Santé", 2000]]
       .map(([id, name, budget], i) => ({ id, name, budget, order: i, created: t, updated: t }));
-    return { categories: cats, debits: [], income: { amount: 0, updated: "" }, saving: { base: 0, baseDate: "", target: 0, updated: "" }, expenses: [], pots: [], moves: [], deleted: {} };
+    return { categories: cats, debits: [], income: { amount: 0, updated: "" }, saving: { base: 0, baseDate: "", target: 0, updated: "" }, goals: [], expenses: [], pots: [], moves: [], deleted: {} };
   }
 
   /* ---------- Stockage ---------- */
@@ -634,6 +668,8 @@ if (typeof document !== "undefined") (function () {
   let filterCat = "";
   let editDebit = "";
   let selDebitCat = "";
+  let editGoal = "";
+  let filterLabel = "";
 
   /* ---------- Toast ---------- */
   let toastT;
@@ -702,6 +738,7 @@ if (typeof document !== "undefined") (function () {
     renderDebits();
     renderCats(T, tm);
     renderForm();
+    renderGoals(tm);
     renderList();
     renderStats(T, tm);
     renderSavings();
@@ -809,6 +846,7 @@ if (typeof document !== "undefined") (function () {
   /* Suggestions : Nourriture, Essence, puis vos libellés les plus utilisés. */
   function labelSuggestions() {
     const base = ["Nourriture", "Essence"], count = {};
+    for (const g of state.goals) if (!base.some(b => labelKey(b) === labelKey(g.name))) base.push(g.name);
     for (const e of state.expenses) { const n = (e.note || "").trim(); if (n) count[n] = (count[n] || 0) + 1; }
     const lower = base.map(s => s.toLowerCase());
     const mine = Object.entries(count).filter(([n]) => !lower.includes(n.toLowerCase())).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([n]) => n);
@@ -826,18 +864,50 @@ if (typeof document !== "undefined") (function () {
     document.querySelectorAll("#e-labels .dchip").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.label.toLowerCase() === n.toLowerCase())));
   }
 
+  /* ---------- Objectifs de dépenses ---------- */
+  const goalsSorted = () => [...state.goals].sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  function goalStatus(g, spent) {
+    const r = g.amount - spent;
+    return r >= 0 ? `il reste ${eur(r)} sur l'objectif ${g.name} (${eur(g.amount)})` : `objectif ${g.name} dépassé de ${eur(-r)}`;
+  }
+  function renderGoals(tm) {
+    tm = tm || timing(view);
+    const sp = goalSpent(state, view), gs = goalsSorted();
+    const totLim = gs.reduce((s, g) => s + g.amount, 0), totSp = gs.reduce((s, g) => s + sp[g.id], 0);
+    $("#go-sum").innerHTML = gs.length ? `${eur(totSp)}<small>sur ${eur(totLim)}</small>` : "";
+    $("#goals").innerHTML = gs.map(g => {
+      const v = sp[g.id], r = g.amount - v, lv = level(v, g.amount, tm.frac);
+      const tick = tm.kind === "current" ? `<i style="left:${(tm.frac * 100).toFixed(1)}%"></i>` : "";
+      const left = r >= 0 ? `<small>reste</small>${eur(r)}` : `<small>dépassé de</small>${eur(-r)}`;
+      const row = `<div class="cat">
+        <div class="cat-top"><span class="cat-name">${esc(g.name)}</span><span class="cat-left num${lv === "ok" ? "" : " " + lv}">${left}</span></div>
+        <div class="bar" role="img" aria-label="${esc(g.name)} : ${eur(v)} dépensés sur ${eur(g.amount)}"><span class="${lv === "ok" ? "" : lv}" style="width:${Math.min(100, v / g.amount * 100)}%"></span>${tick}</div>
+        <div class="cat-foot"><span class="m">${eur(v)} / ${eur(g.amount)}</span><span class="cat-acts"><button type="button" class="sbtn" data-gsee="${g.id}">Voir</button><button type="button" class="sbtn" data-gedit="${g.id}">Modifier</button></span></div>
+      </div>`;
+      if (editGoal !== g.id) return row;
+      return row + `<form class="cat-edit goal-edit" data-gform="${g.id}">
+        <div class="field"><label for="ge-n-${g.id}">Libellé</label><input id="ge-n-${g.id}" value="${esc(g.name)}" maxlength="80"></div>
+        <div class="field"><label for="ge-a-${g.id}">Par mois (€)</label><input id="ge-a-${g.id}" inputmode="decimal" value="${String(g.amount / 100).replace(".", ",")}"></div>
+        <div class="row"><button type="button" class="sbtn del" data-gdel="${g.id}">Supprimer</button><span class="row"><button type="button" class="sbtn" data-gcancel>Annuler</button><button class="sbtn" type="submit" style="font-weight:600">Enregistrer</button></span></div>
+      </form>`;
+    }).join("") || `<p class="empty">Aucun objectif. Fixez par exemple 100 € par mois pour l'essence.</p>`;
+    const taken = new Set(gs.map(g => labelKey(g.name)));
+    const cur = labelKey($("#go-name").value);
+    $("#go-labels").innerHTML = labelSuggestions().filter(n => !taken.has(labelKey(n))).map(n => `<button type="button" class="dchip" data-glabel="${esc(n)}" aria-pressed="${labelKey(n) === cur}">${esc(n)}</button>`).join("");
+  }
+
   function renderList() {
-    const items = state.expenses.filter(e => e.date.slice(0, 7) === view && (!filterCat || e.cat === filterCat))
+    const items = state.expenses.filter(e => e.date.slice(0, 7) === view && (!filterCat || e.cat === filterCat) && (!filterLabel || labelKey(e.note) === filterLabel))
       .sort((a, b) => b.date.localeCompare(a.date) || stampCmp(b, a));
     $("#l-title").textContent = `Dépenses de ${monthName(view).split(" ")[0]}`;
-    $("#l-filter").hidden = !filterCat;
-    if (filterCat) { const s = items.reduce((t, e) => t + e.amount, 0); $("#l-filter-t").textContent = `${catName(filterCat)} · ${eur(s)}`; }
+    $("#l-filter").hidden = !filterCat && !filterLabel;
+    if (filterCat || filterLabel) { const s = items.reduce((t, e) => t + e.amount, 0), g = state.goals.find(x => labelKey(x.name) === filterLabel); $("#l-filter-t").textContent = `${filterCat ? catName(filterCat) : g ? g.name : filterLabel} · ${eur(s)}`; }
     $("#list").innerHTML = items.map(e => {
       const d = new Date(e.date + "T12:00:00");
       return `<div class="item"><div class="date"><b>${d.getDate()}</b>${d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}</div>
         <div class="what"><div class="t">${esc(e.note || catName(e.cat))}</div>${e.note && state.categories.some(c => c.id === e.cat) ? `<div class="s">${esc(catName(e.cat))}</div>` : ""}</div>
         <div class="right"><span class="amt num">${eur(e.amount)}</span><button type="button" class="sbtn del" data-x="${e.id}">Supprimer</button></div></div>`;
-    }).join("") || `<p class="empty">${filterCat ? "Aucune dépense dans cette catégorie ce mois-ci." : "Aucune dépense ce mois-ci."}</p>`;
+    }).join("") || `<p class="empty">${filterCat ? "Aucune dépense dans cette catégorie ce mois-ci." : filterLabel ? "Aucune dépense avec ce libellé ce mois-ci." : "Aucune dépense ce mois-ci."}</p>`;
   }
   const stampCmp = (a, b) => (a.created || "").localeCompare(b.created || "");
 
@@ -896,7 +966,7 @@ if (typeof document !== "undefined") (function () {
 
   /* ---------- Mois ---------- */
   function setMonth(ym) {
-    view = ym; editing = "";
+    view = ym; editing = ""; editGoal = "";
     const cur = todayYm();
     $("#e-date").value = ym === cur ? ymd(new Date()) : ym < cur ? `${ym}-${pad(daysIn(ym))}` : `${ym}-01`;
     render();
@@ -960,6 +1030,8 @@ if (typeof document !== "undefined") (function () {
     $("#e-amount").value = ""; $("#e-note").value = "";
     render();
     const T = monthTotals(state, ym), r = T.income - T.total;
+    const goal = state.goals.find(g => labelKey(g.name) === labelKey(note));
+    if (goal) { toast(`${note} : ${eur(amount)} · ${goalStatus(goal, goalSpent(state, ym)[goal.id])}`); return; }
     toast(!T.income ? `${note} : ${eur(amount)} ajoutés` : r >= 0 ? `${note} : ${eur(amount)} · il vous reste ${eur(r)} ce mois-ci` : `${note} : ${eur(amount)} · vous êtes à −${eur(-r)} ce mois-ci`);
   });
   $("#list").addEventListener("click", e => {
@@ -969,7 +1041,53 @@ if (typeof document !== "undefined") (function () {
     state.expenses = state.expenses.filter(i => i.id !== x.id); state.deleted[x.id] = nowIso(); save(); render();
     toast(`${eur(x.amount)} supprimés`, "Annuler", () => { delete state.deleted[x.id]; x.updated = nowIso(); state.expenses.push(x); save(); render(); });
   });
-  $("#l-filter-x").addEventListener("click", () => { filterCat = ""; render(); });
+  $("#l-filter-x").addEventListener("click", () => { filterCat = ""; filterLabel = ""; render(); });
+
+  /* ---------- Objectifs de dépenses : actions ---------- */
+  $("#go-open").addEventListener("click", () => {
+    const f = $("#f-goal"); f.hidden = !f.hidden;
+    $("#go-open").setAttribute("aria-expanded", String(!f.hidden)); $("#go-open").textContent = f.hidden ? "Ajouter un objectif" : "Fermer";
+    $("#go-msg").hidden = true;
+    if (!f.hidden) $("#go-name").focus();
+  });
+  $("#go-name").addEventListener("input", () => renderGoals());
+  $("#go-labels").addEventListener("click", e => { const b = e.target.closest("[data-glabel]"); if (!b) return; $("#go-name").value = b.dataset.glabel; renderGoals(); $("#go-amount").focus(); });
+  $("#f-goal").addEventListener("submit", e => {
+    e.preventDefault();
+    const name = $("#go-name").value.trim(), amount = parseAmount($("#go-amount").value), m = $("#go-msg");
+    if (!name) { m.hidden = false; m.textContent = "Indiquez un libellé, par exemple Essence."; $("#go-name").focus(); return; }
+    if (!amount) { m.hidden = false; m.textContent = "Indiquez le plafond par mois en euros, par exemple 100."; $("#go-amount").focus(); return; }
+    if (state.goals.some(g => labelKey(g.name) === labelKey(name))) { m.hidden = false; m.textContent = `Il y a déjà un objectif pour « ${name} ».`; return; }
+    m.hidden = true;
+    const t = nowIso();
+    state.goals.push({ id: "g" + uid(), name, amount, created: t, updated: t });
+    $("#go-name").value = ""; $("#go-amount").value = "";
+    $("#f-goal").hidden = true; $("#go-open").textContent = "Ajouter un objectif"; $("#go-open").setAttribute("aria-expanded", "false");
+    save(); render();
+    toast(`Objectif « ${name} » : ${eur(amount)} par mois`);
+  });
+  $("#goals").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.gsee) { const g = state.goals.find(x => x.id === b.dataset.gsee); filterCat = ""; filterLabel = labelKey(g.name); renderList(); $("#l-title").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    if (b.dataset.gedit) { editGoal = editGoal === b.dataset.gedit ? "" : b.dataset.gedit; renderGoals(); const i = $(`#ge-a-${editGoal}`); if (i) i.focus(); return; }
+    if (b.dataset.gcancel !== undefined) { editGoal = ""; renderGoals(); return; }
+    if (b.dataset.gdel) {
+      if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer"; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = "Supprimer"; } }, 3000); return; }
+      const g = state.goals.find(x => x.id === b.dataset.gdel);
+      state.goals = state.goals.filter(x => x.id !== g.id); state.deleted[g.id] = nowIso(); editGoal = ""; save(); render();
+      toast(`Objectif « ${g.name} » supprimé`, "Annuler", () => { delete state.deleted[g.id]; g.updated = nowIso(); state.goals.push(g); save(); render(); });
+    }
+  });
+  $("#goals").addEventListener("submit", e => {
+    e.preventDefault();
+    const f = e.target.closest("form[data-gform]"); if (!f) return;
+    const g = state.goals.find(x => x.id === f.dataset.gform);
+    const name = $(`#ge-n-${g.id}`).value.trim(), amount = parseAmount($(`#ge-a-${g.id}`).value);
+    if (!name || !amount) { toast("Indiquez un libellé et un plafond en euros."); return; }
+    if (state.goals.some(x => x.id !== g.id && labelKey(x.name) === labelKey(name))) { toast(`Il y a déjà un objectif pour « ${name} ».`); return; }
+    g.name = name; g.amount = amount; g.updated = nowIso(); editGoal = ""; save(); render();
+    toast(`Objectif « ${name} » : ${eur(amount)} par mois`);
+  });
 
   /* ---------- Épargne : actions ---------- */
   const fillSave = () => {

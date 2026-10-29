@@ -5,6 +5,7 @@ Application web de suivi de budget personnel, en un seul fichier HTML, sans serv
 ## Fonctionnalités
 
 - **Mois** (accueil) : en gros, ce qui reste ce mois-ci (revenus − prélèvements − dépenses), puis la saisie des dépenses avec un libellé (suggestions : Nourriture, Essence et vos libellés habituels) et leur historique.
+- **Objectifs de dépenses** (onglet Mois) : un plafond mensuel par libellé, par exemple 100 € pour l'Essence ou 250 € pour la Nourriture. Chaque dépense saisie avec ce libellé y est comptée ; une barre montre ce qui reste ou le dépassement, et « Voir » filtre la liste.
 - **Prélèvements** : les prélèvements mensuels rangés par catégorie, et la gestion des catégories.
 - **Stats** : comparaison des dépenses sur les 6 derniers mois.
 - **Épargne** : ce que vous avez de côté, votre objectif, et un prélèvement mensuel d'épargne (compté avec les autres prélèvements et déduit de ce qui reste). Les prévisions montrent, mois par mois, le montant atteint jusqu'à l'objectif.
