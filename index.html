@@ -4,8 +4,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MyCount</title>
 <meta name="description" content="Suivi de budget, dépenses et épargne">
-<link rel="manifest" href="manifest.webmanifest?v=4">
-<meta name="theme-color" content="#2445D6">
+<link rel="manifest" href="manifest.webmanifest?v=5">
+<meta name="theme-color" content="#ECEFF3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E141A" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes">
@@ -222,7 +223,6 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
 <div class="wrap">
   <div class="banner" id="update" hidden><span>Une nouvelle version de MyCount est prête. Vos données sont conservées.</span><button class="ghost" id="update-btn">Mettre à jour</button></div>
   <div class="banner" id="install" hidden><span id="install-text">Installez MyCount sur votre écran d'accueil pour l'ouvrir comme une appli, même hors ligne.</span><button class="ghost" id="install-btn" hidden>Installer</button></div>
-  <div class="banner" id="demo" hidden><span>Aperçu avec des dépenses et une épargne d'exemple. Effacer garde vos catégories et leurs budgets.</span><button class="ghost" id="demo-clear">Effacer les exemples</button></div>
 
   <section class="card" aria-labelledby="h-month">
     <div class="card-head">
@@ -388,7 +388,15 @@ const WalletCore = (() => {
     const moves = (Array.isArray(d.moves) ? d.moves : [])
       .filter(m => m && typeof m.id === "string" && typeof m.pot === "string" && okYmd(m.date) && cents(m.amount) && Number.isFinite(cents(m.amount)))
       .map(m => ({ id: m.id, pot: m.pot, date: m.date, amount: cents(m.amount), created: m.created || "", updated: m.updated || "" }));
-    return { categories, expenses, pots, moves, deleted, demo: d.demo === true };
+    // Anciennes données d'exemple : identifiants fixes (x0, x1…, m0, m1…, pots d'exemple). Les saisies réelles ont des identifiants aléatoires.
+    const DEMO_POTS = ["urgence", "permis", "voyage"];
+    return {
+      categories,
+      expenses: expenses.filter(e => !/^x\d+$/.test(e.id)),
+      pots: pots.filter(p => !DEMO_POTS.includes(p.id)),
+      moves: moves.filter(m => !/^m\d+$/.test(m.id) && !DEMO_POTS.includes(m.pot)),
+      deleted
+    };
   }
 
   /* Solde de chaque objectif d'épargne = somme de ses versements (négatifs pour un retrait). */
@@ -422,7 +430,7 @@ const WalletCore = (() => {
       for (const it of [...x, ...y]) { const cur = m.get(it.id); if (!cur || stamp(it) > stamp(cur)) m.set(it.id, it); }
       return [...m.values()].filter(it => !deleted[it.id]);
     };
-    const merged = { categories: union(a.categories, b.categories), expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted, demo: a.demo && b.demo };
+    const merged = { categories: union(a.categories, b.categories), expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted };
     const all = s => [...s.expenses, ...s.categories, ...s.pots, ...s.moves];
     const aIds = new Set(all(a).map(x => x.id));
     const added = all(merged).filter(x => !aIds.has(x.id)).length;
@@ -431,7 +439,7 @@ const WalletCore = (() => {
   }
 
   function exportPayload(state) {
-    const s = normalize(state); delete s.demo;
+    const s = normalize(state);
     return { app: "mywallet", format: 1, exportedAt: nowIso(), data: s };
   }
 
@@ -481,35 +489,12 @@ if (typeof document !== "undefined") (function () {
   const monthName = ym => { const [y, m] = ym.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }); };
   const monthShort = ym => { const [y, m] = ym.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "short" }).replace(".", ""); };
 
-  /* ---------- Données d'exemple (premier lancement) ---------- */
-  function demoState() {
-    const t = nowIso(), today = new Date(), cur = ymOf(today);
-    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  /* ---------- Premier lancement : catégories par défaut, aucune dépense ---------- */
+  function initialState() {
+    const t = nowIso();
     const cats = [["logement", "Logement", 45000], ["courses", "Courses", 22000], ["transport", "Transport", 4500], ["sorties", "Sorties", 8000], ["abos", "Abonnements", 2500], ["shopping", "Shopping", 6000], ["sante", "Santé", 2000]]
       .map(([id, name, budget], i) => ({ id, name, budget, order: i, created: t, updated: t }));
-    const exp = []; let n = 0;
-    const add = (date, amount, cat, note) => exp.push({ id: "x" + (n++), date, amount: Math.round(amount), cat, note, created: t, updated: t });
-    for (let k = -5; k <= 0; k++) {
-      const ym = ymShift(cur, k), last = k === 0 ? today.getDate() : daysIn(ym);
-      const D = d => `${ym}-${pad(d)}`;
-      if (last >= 5) add(D(5), 45000, "logement", "Loyer");
-      if (last >= 2) add(D(2), 3880, "transport", "Navigo Imagine R");
-      if (last >= 8) add(D(8), 599, "abos", "Spotify Étudiants");
-      if (last >= 12) add(D(12), 999, "abos", "Forfait mobile");
-      for (let d = 3; d <= last; d += 3 + Math.floor(rnd() * 2)) add(D(d), 1400 + rnd() * 3200, "courses", ["Lidl", "Carrefour City", "Marché", "Franprix"][Math.floor(rnd() * 4)]);
-      const outings = (k === 0 ? 6 : 3 + Math.floor(rnd() * 3));
-      for (let i = 0; i < outings; i++) { const d = 1 + Math.floor(rnd() * last); add(D(d), 900 + rnd() * 1900, "sorties", ["Ciné", "Bar avec la promo", "Resto", "Concert"][Math.floor(rnd() * 4)]); }
-      if (rnd() > .35) add(D(Math.max(1, Math.floor(rnd() * last))), 1500 + rnd() * 5000, "shopping", ["Vêtements", "Livres", "Câble USB-C"][Math.floor(rnd() * 3)]);
-      if (rnd() > .6) add(D(Math.max(1, Math.floor(rnd() * last))), 650 + rnd() * 1200, "sante", "Pharmacie");
-      if (rnd() > .7) add(D(Math.max(1, Math.floor(rnd() * last))), 1200 + rnd() * 1000, "transport", "Uber");
-    }
-    const pots = [["urgence", "Fonds d'urgence", 150000, ""], ["permis", "Permis de conduire", 120000, `${today.getFullYear() + 1}-06`], ["voyage", "Voyage cet été", 80000, `${today.getFullYear() + 1}-07`]]
-      .map(([id, name, target, deadline]) => ({ id, name, target, deadline, created: t, updated: t }));
-    const moves = []; let q = 0;
-    const mv = (k, day, amount, pot) => moves.push({ id: "m" + (q++), pot, date: `${ymShift(cur, k)}-${pad(day)}`, amount, created: t, updated: t });
-    [-5, -4, -3, -2, -1].forEach(k => { mv(k, 28, 10000, "urgence"); mv(k, 28, 6000, "permis"); });
-    mv(-3, 15, -4000, "urgence"); mv(-1, 28, 7500, "voyage"); mv(0, Math.min(today.getDate(), 10), 7500, "voyage"); mv(-2, 28, 3000, "urgence");
-    return { categories: cats, expenses: exp, pots, moves, deleted: {}, demo: true };
+    return { categories: cats, expenses: [], pots: [], moves: [], deleted: {} };
   }
 
   /* ---------- Stockage ---------- */
@@ -518,13 +503,10 @@ if (typeof document !== "undefined") (function () {
     try {
       const r = localStorage.getItem(LS);
       if (r) {
-        const raw = JSON.parse(r), s = normalize(raw);
-        // Aperçu ouvert avant l'arrivée de l'onglet Épargne : on ajoute l'épargne d'exemple.
-        if (s.demo && !("pots" in raw)) { const d = demoState(); s.pots = d.pots; s.moves = d.moves; }
-        return s;
+        return normalize(JSON.parse(r));
       }
     } catch (e) { storageOk = false; }
-    return normalize(demoState());
+    return normalize(initialState());
   }
   function save() {
     try { localStorage.setItem(LS, JSON.stringify(state)); storageOk = true; } catch (e) { storageOk = false; }
@@ -572,7 +554,6 @@ if (typeof document !== "undefined") (function () {
     const left = T.budget - T.total;
     $("#h-month").textContent = monthName(view);
     $("#m-next").disabled = view >= ymShift(todayYm(), 1);
-    $("#demo").hidden = !state.demo;
 
     // Synthèse
     $("#h-sub").textContent = tm.kind === "current" ? `Jour ${tm.elapsed} sur ${tm.dim} · ${T.count} dépense${T.count > 1 ? "s" : ""}` : tm.kind === "past" ? `Mois terminé · ${T.count} dépense${T.count > 1 ? "s" : ""}` : "Mois à venir";
@@ -951,12 +932,6 @@ if (typeof document !== "undefined") (function () {
   $("#sim-tip-b").addEventListener("click", e => { sim.monthly = Math.min(100000, Number(e.target.dataset.v)); saveSim(); renderSim(); });
 
   /* ---------- Exemples ---------- */
-  $("#demo-clear").addEventListener("click", () => {
-    const b = $("#demo-clear");
-    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer l'effacement"; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = "Effacer les exemples"; } }, 3000); return; }
-    state.expenses = []; state.pots = []; state.moves = []; state.deleted = {}; state.demo = false; save(); render();
-    toast("Exemples effacés. Ajustez vos objectifs dans Budgets.");
-  });
 
   /* ---------- Synchronisation ---------- */
   $("#btn-sync").addEventListener("click", () => { const s = $("#syncbox"); s.hidden = !s.hidden; $("#btn-sync").setAttribute("aria-expanded", String(!s.hidden)); });
