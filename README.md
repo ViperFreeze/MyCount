@@ -8,7 +8,7 @@ Application web de suivi de budget personnel, en un seul fichier HTML, sans serv
 - **Prélèvements** : les prélèvements mensuels rangés par catégorie, et la gestion des catégories.
 - **Stats** : comparaison des dépenses sur les 6 derniers mois.
 - **Épargne** : objectifs d'épargne avec échéance et versement mensuel suggéré, dépôts et retraits, et simulateur (fonds de départ, versement, durée, taux, dont Livret A) avec date d'atteinte prévue pour chaque objectif.
-- **Synchronisation** entre appareils par copier-coller d'une sauvegarde JSON, fusionnée sans doublons.
+- **Réglages** (comme MyHours) : revenus mensuels, thème clair/sombre/auto, sauvegarde automatique dans un Gist GitHub privé, export/import de fichier, copier-coller entre appareils (fusion sans doublons) et remise à zéro des dépenses.
 
 Au premier lancement, l'appli démarre vide avec des catégories par défaut, à ajuster dans l'onglet Prélèvements.
 

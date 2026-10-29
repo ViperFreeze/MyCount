@@ -13,6 +13,17 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MyCount">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+<script>
+/* Thème choisi (auto / clair / sombre) appliqué avant l'affichage : pas de flash blanc en mode sombre. */
+(function () {
+  var t = "auto"; try { t = localStorage.getItem("mycount-theme") || "auto"; } catch (e) {}
+  if (t === "light" || t === "dark") {
+    document.documentElement.setAttribute("data-theme", t);
+    var c = t === "dark" ? "#0E141A" : "#ECEFF3";
+    document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.setAttribute("content", c); });
+  }
+})();
+</script>
 <style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap">
@@ -111,8 +122,23 @@ button,input,select,textarea{font:inherit;color:inherit}
 .pace{font-size:13px;color:var(--muted)}
 .pace b{color:var(--ink)}
 
-.drawer{border-top:1px dashed var(--line);padding-top:14px;display:flex;flex-direction:column;gap:10px}
+.drawer{border-top:1px dashed var(--line);padding-top:14px;display:flex;flex-direction:column;gap:12px}
 .drawer h2{font-size:17px;font-stretch:90%;font-weight:700}
+.drawer > .row{justify-content:flex-end}
+.sect{border-top:1px dashed var(--line);padding-top:14px;margin-top:4px;display:flex;flex-direction:column;gap:10px}
+.sect .rhint{font-size:13px;color:var(--muted);margin:0}
+.sect .rhint a{color:var(--accent)}
+.sect .rrow{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.sect .rrow .field{flex:1;min-width:180px}
+.dangerbtn{background:var(--surface);color:var(--danger);border:1px solid var(--danger);border-radius:10px;padding:10px 16px;font-weight:600;font-size:15px;cursor:pointer;min-height:42px}
+.dangerbtn[data-armed="1"]{background:var(--danger);color:var(--surface)}
+.dangerbtn:disabled{opacity:.45;cursor:default}
+.head-btns{display:flex;gap:6px;flex:none}
+.head-btns .ghost{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 10px;font-weight:600;color:var(--ink)}
+.head-btns .ghost.icon{width:34px;padding:0}
+.ghost[aria-expanded="true"]{background:var(--sunk);border-color:var(--muted)}
+.ico{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+@media (max-width:420px){.head-btns .ghost .txt{display:none}.head-btns .ghost{width:34px;padding:0}}
 .steps{margin:0;padding-left:20px;font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
 .steps b{color:var(--ink)}
 .row{display:flex;gap:8px;flex-wrap:wrap}
@@ -257,25 +283,65 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
         </div>
         <div class="sub" id="h-sub"></div>
       </div>
-      <button class="ghost" id="btn-sync" aria-expanded="false">Synchroniser</button>
+      <div class="head-btns">
+        <button class="ghost icon" id="btn-theme" type="button" aria-label="Thème : automatique" title="Thème : automatique"></button>
+        <button class="ghost" id="btn-settings" type="button" aria-expanded="false" aria-controls="settings" aria-label="Réglages" title="Réglages">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="txt">Réglages</span>
+        </button>
+      </div>
     </div>
 
-    <div class="drawer" id="syncbox" hidden>
-      <h2>Synchroniser vos appareils</h2>
-      <ol class="steps">
-        <li>Sur le premier appareil, touchez <b>Copier mes données</b> et envoyez-vous le texte (Notes, messagerie…).</li>
-        <li>Sur l'autre appareil, collez-le ci-dessous puis touchez <b>Fusionner</b>.</li>
-        <li>Rien n'est écrasé : les deux carnets sont réunis et les suppressions sont reportées.</li>
-      </ol>
-      <div class="row"><button type="button" class="primary" id="x-export">Copier mes données</button></div>
-      <textarea id="x-text" placeholder="Collez ici les données copiées depuis l'autre appareil" spellcheck="false"></textarea>
-      <div class="row">
-        <button type="button" class="secondary" id="x-import">Fusionner</button>
-        <button type="button" class="secondary" id="x-pick">Choisir un fichier .json</button>
-        <input type="file" id="x-file" accept="application/json,.json" hidden>
+    <form class="drawer" id="settings" novalidate hidden>
+      <h2>Réglages</h2>
+      <div class="field"><label for="set-income">Revenus par mois (€)</label><input id="set-income" inputmode="decimal" autocomplete="off" placeholder="1 200"></div>
+      <p class="msg" id="set-err" hidden></p>
+      <div class="row"><button type="button" class="secondary" id="set-cancel">Fermer</button><button class="primary" type="submit">Enregistrer</button></div>
+
+      <div class="sect">
+        <h2>Sauvegarde automatique</h2>
+        <p class="rhint">Après chaque modification, une copie de toutes vos données part dans un Gist privé de votre compte GitHub, qui garde l'historique des versions. Sur un nouveau téléphone, collez le même jeton : la sauvegarde est retrouvée et fusionnée.</p>
+        <div class="rrow" id="gh-setup">
+          <div class="field"><label for="gh-token">Jeton GitHub</label><input id="gh-token" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_…"></div>
+          <button type="button" class="secondary" id="gh-on">Activer</button>
+        </div>
+        <p class="rhint" id="gh-help">Pas encore de jeton ? <a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=MyCount%20sauvegarde" target="_blank" rel="noopener">Créez-le sur GitHub</a> : la case <b>gist</b> est déjà cochée, choisissez « No expiration », puis copiez le jeton ici. Il reste sur cet appareil et n'est jamais exporté.</p>
+        <div class="rrow" id="gh-active" hidden>
+          <button type="button" class="secondary" id="gh-now">Sauvegarder maintenant</button>
+          <button type="button" class="dangerbtn" id="gh-stop">Désactiver</button>
+        </div>
+        <p class="rhint" id="gh-hint" aria-live="polite"></p>
       </div>
-      <div class="msg" id="x-msg" hidden></div>
-    </div>
+
+      <div class="sect">
+        <h2>Fichier de sauvegarde</h2>
+        <p class="rhint">« Exporter » crée un fichier à vous envoyer (Drive, mail, messagerie…). « Importer » le fusionne sur un autre appareil : rien n'est écrasé, les suppressions sont reportées.</p>
+        <div class="rrow">
+          <button type="button" class="secondary" id="x-export">Exporter</button>
+          <button type="button" class="secondary" id="x-import">Importer</button>
+          <input type="file" id="x-file" accept="application/json,.json" hidden>
+        </div>
+        <p class="msg" id="x-msg" hidden></p>
+      </div>
+
+      <div class="sect">
+        <h2>Copier-coller entre appareils</h2>
+        <p class="rhint">Sans fichier : copiez vos données, envoyez-vous le texte (Notes, messagerie…), puis collez-le ici sur l'autre appareil et touchez « Fusionner ».</p>
+        <div class="rrow"><button type="button" class="secondary" id="x-copy">Copier mes données</button></div>
+        <textarea id="x-text" placeholder="Collez ici les données copiées depuis l'autre appareil" spellcheck="false"></textarea>
+        <div class="rrow"><button type="button" class="secondary" id="x-merge">Fusionner</button></div>
+        <p class="msg" id="xp-msg" hidden></p>
+      </div>
+
+      <div class="sect">
+        <h2>Remettre les dépenses à zéro</h2>
+        <p class="rhint">Efface les dépenses saisies, au choix toutes ou celles d'un mois. Les prélèvements, les revenus et l'épargne ne changent pas.</p>
+        <div class="rrow">
+          <div class="field"><label for="r-scope">Dépenses à effacer</label><select id="r-scope"></select></div>
+          <button type="button" class="dangerbtn" id="r-go">Effacer</button>
+        </div>
+        <p class="rhint" id="r-hint"></p>
+      </div>
+    </form>
 
     <div class="left-label">Il vous reste ce mois-ci</div>
     <div class="big"><span class="done num" id="f-left">–</span><span class="chip" id="f-status" hidden></span></div>
@@ -291,7 +357,6 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
       <div class="fig"><span class="label">Dépenses</span><b class="num" id="k-spent">0 €</b></div>
       <div class="fig"><span class="label" id="k-day-l">Après prélèv.</span><b class="num" id="k-day">–</b></div>
     </div>
-    <div class="pace" id="pace"></div>
   </section>
 
   <nav class="tabs" role="tablist" aria-label="Sections">
@@ -559,7 +624,7 @@ if (typeof document !== "undefined") (function () {
   }
   function save() {
     try { localStorage.setItem(LS, JSON.stringify(state)); storageOk = true; } catch (e) { storageOk = false; }
-    $("#status").textContent = storageOk ? "Données enregistrées sur cet appareil. Rien n'est envoyé." : "Ce navigateur n'enregistre rien : vos saisies seront perdues en fermant la page.";
+    scheduleBackup();
   }
 
   let state = load();
@@ -570,7 +635,6 @@ if (typeof document !== "undefined") (function () {
   let filterCat = "";
   let editDebit = "";
   let selDebitCat = "";
-  let incomeOpen = false;
 
   /* ---------- Toast ---------- */
   let toastT;
@@ -620,7 +684,7 @@ if (typeof document !== "undefined") (function () {
     st.textContent = lv === "bad" ? "Dans le rouge" : lv === "warn" ? "Rythme trop élevé" : tm.kind === "future" ? "Prévision" : "Ça va";
     $("#income-t").innerHTML = has ? `Revenus du mois : <b>${eur(T.income)}</b>` : "Indiquez vos revenus pour savoir ce qui vous reste.";
     $("#income-edit").textContent = has ? "Modifier" : "Indiquer";
-    $("#income-form").hidden = !(incomeOpen || !has);
+    $("#income-form").hidden = has;
     $("#income-edit").hidden = !has;
 
     const base = Math.max(T.income, T.total, 1);
@@ -635,16 +699,6 @@ if (typeof document !== "undefined") (function () {
     // Revenus − prélèvements : ce qu'il reste pour les dépenses du mois
     const afterDebits = T.income - T.debits;
     $("#k-day").textContent = has ? (afterDebits < 0 ? "−" : "") + eurR(Math.abs(afterDebits)) : "–";
-
-    let pace = "";
-    if (!has) pace = "MyCount déduit vos prélèvements et vos dépenses de vos revenus pour afficher ce qu'il vous reste.";
-    else if (tm.kind === "current" && T.spent > 0) pace = proj >= 0
-      ? `À ce rythme de dépenses, il vous resterait environ <b>${eurR(proj)}</b> fin ${mon}.`
-      : `À ce rythme de dépenses, vous finiriez ${mon} à <b>−${eurR(-proj)}</b>.`;
-    else if (tm.kind === "current") pace = `Pas encore de dépense ce mois-ci : après vos prélèvements, il vous reste <b>${eurR(left)}</b>.`;
-    else if (tm.kind === "past") pace = left >= 0 ? `Mois bouclé avec <b>${eurR(left)}</b> de côté.` : `Mois bouclé avec <b>${eurR(-left)}</b> de dépassement.`;
-    else pace = `Prélèvements prévus : <b>${eurR(T.debits)}</b>.`;
-    $("#pace").innerHTML = pace;
 
     renderDebits();
     renderCats(T, tm);
@@ -1019,15 +1073,12 @@ if (typeof document !== "undefined") (function () {
   $("#sim-tip-b").addEventListener("click", e => { sim.monthly = Math.min(100000, Number(e.target.dataset.v)); saveSim(); renderSim(); });
 
   /* ---------- Revenus ---------- */
-  $("#income-edit").addEventListener("click", () => {
-    incomeOpen = !incomeOpen; render();
-    if (incomeOpen) { const i = $("#income-in"); i.value = String(state.income.amount / 100).replace(".", ","); i.focus(); }
-  });
+  $("#income-edit").addEventListener("click", () => { openDrawer(true); $("#set-income").focus(); });
   $("#income-form").addEventListener("submit", e => {
     e.preventDefault();
     const a = parseAmount($("#income-in").value);
     if (!a) { toast("Indiquez vos revenus en euros, par exemple 1200."); $("#income-in").focus(); return; }
-    state.income = { amount: a, updated: nowIso() }; incomeOpen = false; $("#income-in").value = ""; save(); render();
+    state.income = { amount: a, updated: nowIso() }; $("#income-in").value = ""; save(); render();
     toast(`Revenus : ${eur(a)} par mois`);
   });
 
@@ -1083,26 +1134,287 @@ if (typeof document !== "undefined") (function () {
 
 
   /* ---------- Synchronisation ---------- */
-  $("#btn-sync").addEventListener("click", () => { const s = $("#syncbox"); s.hidden = !s.hidden; $("#btn-sync").setAttribute("aria-expanded", String(!s.hidden)); });
-  const xmsg = (t, ok) => { const m = $("#x-msg"); m.hidden = false; m.textContent = t; m.classList.toggle("okm", !!ok); };
-  $("#x-export").addEventListener("click", () => {
+  const dfStamp = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  /* Bouton à double appui : le premier arme (« Confirmer… »), le second agit. */
+  function armed(b, label) {
+    if (b.dataset.armed === "1") { b.dataset.armed = ""; b.textContent = b.dataset.orig; return true; }
+    b.dataset.orig = b.textContent; b.dataset.armed = "1"; b.textContent = label || "Confirmer";
+    setTimeout(() => { if (b.dataset.armed === "1") { b.dataset.armed = ""; b.textContent = b.dataset.orig; } }, 3500);
+    return false;
+  }
+
+  /* ---------- Sauvegarde automatique dans un Gist GitHub privé (comme MyHours) ----------
+     Un jeton GitHub (droit « gist » seulement) est collé une fois dans Réglages. Il reste sur cet appareil,
+     hors des données : il n'apparaît jamais dans un export. Après chaque modification, une copie complète
+     part quelques secondes plus tard dans un Gist privé ; GitHub garde l'historique. Si le Gist a été
+     modifié ailleurs (autre appareil), il est d'abord fusionné ici, sans rien écraser. */
+  const GH = LS + "-gist"; // { token, id, sig, remoteAt, last, error }
+  const GIST_FILE = "mycount-sauvegarde.json", GIST_DESC = "MyCount – sauvegarde automatique";
+  const ghGet = () => { try { return JSON.parse(localStorage.getItem(GH) || "{}") || {}; } catch (e) { return {}; } };
+  const ghSet = patch => { const v = { ...ghGet(), ...patch }; try { localStorage.setItem(GH, JSON.stringify(v)); } catch (e) {} return v; };
+  const ghOn = () => !!ghGet().token;
+  function dataSig() {
+    const t = JSON.stringify(exportPayload(state).data);
+    let x = 5381; for (let i = 0; i < t.length; i++) x = ((x * 33) ^ t.charCodeAt(i)) >>> 0;
+    return t.length + ":" + x;
+  }
+  const ghPending = () => ghOn() && ghGet().sig !== dataSig();
+  async function gh(method, path, token, body) {
+    try {
+      return await fetch("https://api.github.com" + path, {
+        method, cache: "no-store",
+        headers: { Authorization: "Bearer " + token, Accept: "application/vnd.github+json", ...(body ? { "Content-Type": "application/json" } : {}) },
+        body: body ? JSON.stringify(body) : undefined
+      });
+    } catch (e) { throw new Error("GitHub est injoignable pour le moment."); }
+  }
+  function ghError(r) {
+    if (r.status === 401) return new Error("Jeton GitHub refusé ou expiré : collez-en un nouveau dans Réglages.");
+    if (r.status === 403 || r.status === 404 || r.status === 422) return new Error("Ce jeton n'a pas le droit de gérer les gists.");
+    return new Error(`GitHub a refusé la sauvegarde (erreur ${r.status}).`);
+  }
+  const offlineError = () => Object.assign(new Error("Pas de réseau : la sauvegarde partira dès le retour de la connexion."), { offline: true });
+  async function ghFind(token) {
+    const r = await gh("GET", "/gists?per_page=100", token);
+    if (!r.ok) throw ghError(r);
+    const scopes = r.headers.get("X-OAuth-Scopes");
+    if (scopes !== null && !scopes.split(",").map(s => s.trim()).includes("gist")) throw new Error("Ce jeton n'a pas le droit « gist ». Créez-en un avec cette case cochée.");
+    const g = (await r.json()).find(g => g.files && g.files[GIST_FILE]);
+    return g ? g.id : "";
+  }
+  async function ghMerge(g) {
+    const f = g.files && g.files[GIST_FILE];
+    if (!f) return null;
+    let text = f.content;
+    if (f.truncated) { const r = await fetch(f.raw_url, { cache: "no-store" }); if (!r.ok) throw new Error("Lecture de la sauvegarde en ligne impossible."); text = await r.text(); }
+    const { merged, report } = merge(state, parseImport(text));
+    state = merged; save(); render();
+    return report;
+  }
+  let ghBusy = null, ghTimer = null;
+  function ghSync() {
+    if (ghBusy) return ghBusy;
+    ghBusy = (async () => {
+      const s = ghGet();
+      if (!s.token) throw new Error("Sauvegarde automatique non activée.");
+      if (!navigator.onLine) throw offlineError();
+      let report = null;
+      if (s.id) {
+        const r = await gh("GET", "/gists/" + s.id, s.token);
+        if (r.status === 404) ghSet({ id: "", remoteAt: "" });
+        else if (!r.ok) throw ghError(r);
+        else { const g = await r.json(); if (g.updated_at !== s.remoteAt) { report = await ghMerge(g); ghSet({ remoteAt: g.updated_at }); } }
+      }
+      if (ghPending()) {
+        const sig = dataSig(), cur = ghGet();
+        const files = { [GIST_FILE]: { content: JSON.stringify(exportPayload(state), null, 1) } };
+        const r = cur.id
+          ? await gh("PATCH", "/gists/" + cur.id, cur.token, { files })
+          : await gh("POST", "/gists", cur.token, { description: GIST_DESC, public: false, files });
+        if (!r.ok) throw ghError(r);
+        const g = await r.json();
+        ghSet({ id: g.id, sig, remoteAt: g.updated_at, last: nowIso() });
+      }
+      ghSet({ error: "" });
+      return report;
+    })()
+      .catch(e => { if (!e.offline) ghSet({ error: e.message }); throw e; })
+      .finally(() => { ghBusy = null; renderStatus(); if (ghPending() && navigator.onLine && !ghGet().error) ghSoon(1500); });
+    renderStatus();
+    return ghBusy;
+  }
+  function ghSoon(delay) {
+    clearTimeout(ghTimer);
+    if (!ghOn() || !navigator.onLine) { renderStatus(); return; }
+    ghTimer = setTimeout(() => ghSync().then(rep => { if (rep && rep.added) toast("Données récupérées depuis la sauvegarde en ligne"); }).catch(() => {}), delay);
+    renderStatus();
+  }
+  function scheduleBackup() { if (ghPending()) ghSoon(4000); else renderStatus(); }
+  function ghLabel() {
+    const s = ghGet();
+    if (!s.token) return "";
+    if (ghBusy) return "sauvegarde en cours…";
+    if (s.error) return "la sauvegarde en ligne a échoué";
+    if (ghPending()) return navigator.onLine ? "sauvegarde en ligne dans un instant" : "sauvegarde en ligne en attente du réseau";
+    return s.last ? `sauvegardé en ligne le ${dfStamp.format(new Date(s.last))}` : "sauvegarde en ligne active";
+  }
+  function renderStatus() {
+    const lbl = ghLabel();
+    $("#status").textContent = !storageOk
+      ? "Ce navigateur n'enregistre rien : vos saisies seront perdues en fermant la page."
+      : `Données enregistrées sur cet appareil${lbl ? ` · ${lbl}` : ""}.`;
+    const s = ghGet();
+    $("#gh-setup").hidden = !!s.token; $("#gh-active").hidden = !s.token; $("#gh-help").hidden = !!s.token;
+    $("#gh-hint").textContent = s.token ? cap(lbl) + "." + (s.error ? ` ${s.error}` : "") : "";
+  }
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+  $("#gh-on").addEventListener("click", async ev => {
+    const btn = ev.currentTarget, token = $("#gh-token").value.trim(), hint = $("#gh-hint");
+    if (!token) { hint.textContent = "Collez d'abord votre jeton GitHub."; $("#gh-token").focus(); return; }
+    if (!navigator.onLine) { hint.textContent = "Pas de réseau : réessayez une fois connecté."; return; }
+    btn.disabled = true; btn.textContent = "Vérification…";
+    try {
+      const id = await ghFind(token);
+      ghSet({ token, id, sig: "", remoteAt: "", last: "", error: "" });
+      $("#gh-token").value = "";
+      const rep = await ghSync();
+      toast(id ? (rep && rep.added ? "Sauvegarde retrouvée et fusionnée avec cet appareil" : "Sauvegarde retrouvée : elle sera tenue à jour") : "Sauvegarde automatique activée");
+    } catch (e) {
+      if (!ghGet().id) { try { localStorage.removeItem(GH); } catch (err) {} }
+      renderStatus();
+      hint.textContent = e.message || "Activation impossible.";
+    } finally { btn.disabled = false; btn.textContent = "Activer"; }
+  });
+  $("#gh-token").addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); $("#gh-on").click(); } });
+  $("#gh-now").addEventListener("click", async () => {
+    if (!navigator.onLine) { toast("Pas de réseau : la sauvegarde partira dès le retour de la connexion."); return; }
+    clearTimeout(ghTimer);
+    try { await ghSync(); toast("Sauvegarde en ligne à jour"); } catch (e) { toast(e.message || "Sauvegarde en ligne impossible."); }
+  });
+  $("#gh-stop").addEventListener("click", ev => {
+    if (!armed(ev.currentTarget, "Confirmer la désactivation")) return;
+    clearTimeout(ghTimer);
+    try { localStorage.removeItem(GH); } catch (e) {}
+    renderStatus(); $("#gh-hint").textContent = "Désactivée. La dernière copie reste dans votre Gist sur GitHub.";
+  });
+  window.addEventListener("online", () => ghSoon(1000));
+  window.addEventListener("offline", renderStatus);
+  document.addEventListener("visibilitychange", () => {
+    if (!ghOn() || !navigator.onLine) return;
+    if (document.hidden) { if (ghPending()) { clearTimeout(ghTimer); ghSync().catch(() => {}); } }
+    else ghSoon(1500);
+  });
+
+  /* ---------- Thème : automatique, clair ou sombre ---------- */
+  const THEME = "mycount-theme";
+  const THEMES = {
+    auto: { label: "automatique", icon: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>' },
+    light: { label: "clair", icon: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>' },
+    dark: { label: "sombre", icon: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>' }
+  };
+  let theme = "auto";
+  try { theme = localStorage.getItem(THEME) || "auto"; } catch (e) {}
+  if (!THEMES[theme]) theme = "auto";
+  function applyTheme(announce) {
+    const root = document.documentElement;
+    if (theme === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", theme);
+    const metas = document.querySelectorAll('meta[name="theme-color"]');
+    if (theme === "auto") { metas[0] && metas[0].setAttribute("content", "#ECEFF3"); metas[1] && metas[1].setAttribute("content", "#0E141A"); }
+    else metas.forEach(m => m.setAttribute("content", theme === "dark" ? "#0E141A" : "#ECEFF3"));
+    const b = $("#btn-theme"), t = THEMES[theme];
+    b.innerHTML = t.icon;
+    b.setAttribute("aria-label", `Thème : ${t.label}. Toucher pour changer`);
+    b.title = `Thème : ${t.label}`;
+    if (announce) toast(theme === "auto" ? "Thème automatique (suit le téléphone)" : `Thème ${t.label}`);
+  }
+  $("#btn-theme").addEventListener("click", () => {
+    theme = { auto: "light", light: "dark", dark: "auto" }[theme];
+    try { localStorage.setItem(THEME, theme); } catch (e) {}
+    applyTheme(true);
+  });
+  applyTheme(false);
+
+  /* ---------- Tiroir des réglages ---------- */
+  function openDrawer(open) {
+    $("#settings").hidden = !open; $("#btn-settings").setAttribute("aria-expanded", String(open));
+    if (open) {
+      $("#set-income").value = state.income.amount ? String(state.income.amount / 100).replace(".", ",") : "";
+      $("#set-err").hidden = true; $("#x-msg").hidden = true; $("#xp-msg").hidden = true;
+      renderReset(); renderStatus();
+    }
+  }
+  $("#btn-settings").addEventListener("click", () => openDrawer($("#settings").hidden));
+  $("#set-cancel").addEventListener("click", () => { openDrawer(false); $("#btn-settings").focus(); });
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !$("#settings").hidden) { openDrawer(false); $("#btn-settings").focus(); } });
+  $("#settings").addEventListener("submit", ev => {
+    ev.preventDefault();
+    const raw = $("#set-income").value.trim(), a = raw === "" || raw === "0" ? 0 : parseAmount(raw), m = $("#set-err");
+    if (raw && raw !== "0" && !a) { m.hidden = false; m.textContent = "Indiquez vos revenus en euros, par exemple 1200 ou 1450,50."; $("#set-income").focus(); return; }
+    m.hidden = true;
+    state.income = { amount: a, updated: nowIso() };
+    openDrawer(false); save(); render(); toast("Réglages enregistrés");
+  });
+
+  /* ---------- Fichier de sauvegarde ---------- */
+  const msgIn = (id, t, ok) => { const m = $(id); m.hidden = false; m.textContent = t; m.classList.toggle("okm", !!ok); };
+  const fusionText = r => `Fusion faite : ${r.added} élément${r.added > 1 ? "s" : ""} ajouté${r.added > 1 ? "s" : ""}, ${r.removed} supprimé${r.removed > 1 ? "s" : ""}.`;
+  async function exportFile() {
+    const json = JSON.stringify(exportPayload(state), null, 2);
+    const name = `mycount-${ymd(new Date())}.json`;
+    let file = null;
+    try { file = new File([json], name, { type: "application/json" }); } catch (e) {}
+    try {
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: "MyCount" });
+      else {
+        const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+        const a = document.createElement("a"); a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+      }
+    } catch (e) {
+      if (e && e.name === "AbortError") return null;
+      throw new Error("L'export n'a pas pu être envoyé. Réessayez, ou utilisez un autre navigateur.");
+    }
+    return name;
+  }
+  $("#x-export").addEventListener("click", async () => {
+    try { const name = await exportFile(); if (name) msgIn("#x-msg", `Fichier « ${name} » créé. Importez-le sur votre autre appareil, ou gardez-le comme sauvegarde.`, true); }
+    catch (e) { msgIn("#x-msg", e.message); }
+  });
+  function doImport(text, where) {
+    try {
+      const { merged, report } = merge(state, parseImport(text.trim()));
+      state = merged; save(); render();
+      msgIn(where, fusionText(report), true);
+      return true;
+    } catch (err) { msgIn(where, err.message); return false; }
+  }
+  $("#x-import").addEventListener("click", () => { $("#x-file").value = ""; $("#x-file").click(); });
+  $("#x-file").addEventListener("change", async () => {
+    const f = $("#x-file").files && $("#x-file").files[0]; if (!f) return;
+    let text; try { text = await f.text(); } catch (e) { msgIn("#x-msg", "Ce fichier n'a pas pu être lu."); return; }
+    doImport(text, "#x-msg");
+  });
+
+  /* ---------- Copier-coller ---------- */
+  $("#x-copy").addEventListener("click", () => {
     const text = JSON.stringify(exportPayload(state)), ta = $("#x-text");
     ta.value = text;
-    const fallback = () => { ta.focus(); ta.select(); xmsg("Le texte est sélectionné ci-dessus : copiez-le, puis envoyez-le à votre autre appareil."); };
-    try { navigator.clipboard.writeText(text).then(() => xmsg("Copié. Collez-le sur l'autre appareil, dans ce même encadré.", true), fallback); } catch (e) { fallback(); }
+    const fallback = () => { ta.focus(); ta.select(); msgIn("#xp-msg", "Le texte est sélectionné ci-dessus : copiez-le, puis envoyez-le à votre autre appareil."); };
+    try { navigator.clipboard.writeText(text).then(() => msgIn("#xp-msg", "Copié. Collez-le sur l'autre appareil, dans ce même encadré.", true), fallback); } catch (e) { fallback(); }
   });
-  function doImport(text) {
-    try {
-      const inc = parseImport(text.trim());
-      const { merged, report } = merge(state, inc);
-      state = merged; save(); render();
-      xmsg(`Fusion faite : ${report.added} élément${report.added > 1 ? "s" : ""} ajouté${report.added > 1 ? "s" : ""}, ${report.removed} supprimé${report.removed > 1 ? "s" : ""}.`, true);
-      $("#x-text").value = "";
-    } catch (err) { xmsg(err.message); }
+  $("#x-merge").addEventListener("click", () => {
+    const t = $("#x-text").value;
+    if (!t.trim()) { msgIn("#xp-msg", "Collez d'abord les données copiées sur l'autre appareil."); return; }
+    if (doImport(t, "#xp-msg")) $("#x-text").value = "";
+  });
+
+  /* ---------- Remise à zéro des dépenses ---------- */
+  const resetTargets = v => state.expenses.filter(e => v === "all" || e.date.slice(0, 7) === v);
+  function renderReset() {
+    const sel = $("#r-scope"), prev = sel.value;
+    const months = [...new Set(state.expenses.map(e => e.date.slice(0, 7)))].sort().reverse();
+    sel.innerHTML = `<option value="all">Toutes les dépenses (${state.expenses.length})</option>` + months.map(m => `<option value="${m}">${cap(monthName(m))} (${resetTargets(m).length})</option>`).join("");
+    sel.value = [...sel.options].some(o => o.value === prev) ? prev : (months.includes(view) ? view : "all");
+    updateResetHint();
   }
-  $("#x-import").addEventListener("click", () => { const t = $("#x-text").value; if (!t.trim()) { xmsg("Collez d'abord les données copiées sur l'autre appareil."); return; } doImport(t); });
-  $("#x-pick").addEventListener("click", () => $("#x-file").click());
-  $("#x-file").addEventListener("change", e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => doImport(String(r.result)); r.readAsText(f); e.target.value = ""; });
+  function updateResetHint() {
+    const n = resetTargets($("#r-scope").value).length, b = $("#r-go");
+    if (b.dataset.armed === "1") { b.dataset.armed = ""; b.textContent = b.dataset.orig; }
+    b.disabled = !n;
+    $("#r-hint").textContent = n ? `${n} dépense${n > 1 ? "s" : ""} ser${n > 1 ? "ont" : "a"} effacée${n > 1 ? "s" : ""}. Une sauvegarde avant, par sécurité ?` : "Aucune dépense à effacer.";
+  }
+  $("#r-scope").addEventListener("change", updateResetHint);
+  $("#r-go").addEventListener("click", ev => {
+    const v = $("#r-scope").value, list = resetTargets(v);
+    if (!list.length || !armed(ev.currentTarget, "Confirmer l'effacement")) return;
+    const t = nowIso(), ids = new Set(list.map(e => e.id));
+    state.expenses = state.expenses.filter(e => !ids.has(e.id)); list.forEach(e => { state.deleted[e.id] = t; });
+    save(); render(); renderReset();
+    toast(`${list.length} dépense${list.length > 1 ? "s" : ""} effacée${list.length > 1 ? "s" : ""}`, "Annuler", () => { const u = nowIso(); list.forEach(e => { delete state.deleted[e.id]; e.updated = u; }); state.expenses.push(...list); save(); render(); renderReset(); });
+  });
 
   window.addEventListener("storage", e => { if (e.key === LS) { state = load(); render(); } });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
