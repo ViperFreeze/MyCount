@@ -92,6 +92,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 .dday{font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase}
 .dname{overflow-wrap:anywhere;min-width:0}
 .dform{display:flex;flex-direction:column;gap:12px}
+.cat-add{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;border-top:1px solid var(--line);padding-top:12px}
+.crow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.crow:first-child{border-top:0}
+.crow .m{font-size:12px;color:var(--muted);font-family:var(--f-mono)}
+.cedit{display:grid;grid-template-columns:1fr;gap:8px;background:var(--sunk);border-radius:10px;padding:10px;margin-bottom:6px}
+.cedit .field input{background:var(--surface)}
+.cedit .row{justify-content:space-between}
 .field select{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surface);min-height:42px;color:var(--ink);font:inherit}
 .dedit{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--sunk);border-radius:10px;padding:10px;margin:4px 0}
 .dedit .field input{background:var(--surface)}
@@ -289,30 +296,12 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
 
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button class="tab" role="tab" id="t-log" aria-controls="p-log" aria-selected="true">Mois</button>
-    <button class="tab" role="tab" id="t-budgets" aria-controls="p-budgets" aria-selected="false">Budgets</button>
+    <button class="tab" role="tab" id="t-budgets" aria-controls="p-budgets" aria-selected="false">Prélèvements</button>
     <button class="tab" role="tab" id="t-save" aria-controls="p-save" aria-selected="false">Épargne</button>
     <button class="tab" role="tab" id="t-stats" aria-controls="p-stats" aria-selected="false">Stats</button>
   </nav>
 
   <section class="panel" id="p-budgets" role="tabpanel" aria-labelledby="t-budgets" hidden>
-    <div class="box">
-      <h2>Ce qui reste par catégorie</h2>
-      <p class="hint">Le trait vertical marque où vous devriez en être aujourd'hui pour finir le mois pile dans l'objectif.</p>
-      <div class="cats" id="cats"></div>
-      <div class="total"><span>Total des objectifs mensuels</span><b id="cats-total">0 €</b></div>
-    </div>
-    <form class="box" id="f-cat" novalidate>
-      <h2>Nouvelle catégorie</h2>
-      <div class="two">
-        <div class="field"><label for="c-name">Nom</label><input id="c-name" maxlength="40" placeholder="Ex. Cadeaux" required></div>
-        <div class="field"><label for="c-budget">Objectif par mois (€)</label><input id="c-budget" inputmode="decimal" placeholder="50" required></div>
-      </div>
-      <div class="msg" id="c-msg" hidden></div>
-      <button class="secondary" type="submit">Ajouter la catégorie</button>
-    </form>
-  </section>
-
-  <section class="panel" id="p-log" role="tabpanel" aria-labelledby="t-log">
     <div class="box" id="debits-box">
       <div class="pot-head"><h2>Prélèvements</h2><span class="pot-sum num" id="d-sum">0 €<small>par mois</small></span></div>
       <p class="hint">Ce qui part tout seul chaque mois : loyer, forfait, abonnements… C'est déduit automatiquement de ce qui vous reste.</p>
@@ -329,15 +318,26 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
         <button class="primary" type="submit">Ajouter le prélèvement</button>
       </form>
     </div>
+    <div class="box">
+      <h2>Catégories</h2>
+      <p class="hint">Pour ranger vos prélèvements.</p>
+      <div class="cats" id="cats"></div>
+      <form class="cat-add" id="f-cat" novalidate>
+        <div class="field"><label for="c-name">Nouvelle catégorie</label><input id="c-name" maxlength="40" placeholder="Ex. Assurances"></div>
+        <button class="secondary" type="submit">Ajouter</button>
+      </form>
+      <div class="msg" id="c-msg" hidden></div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-log" role="tabpanel" aria-labelledby="t-log">
     <form class="box" id="f-exp" novalidate>
       <h2>Nouvelle dépense</h2>
       <div class="field amount"><label for="e-amount">Montant</label><input id="e-amount" inputmode="decimal" autocomplete="off" placeholder="0,00"><span>€</span></div>
       <div class="chips" id="e-quick"></div>
-      <div class="field"><span class="flabel">Catégorie</span><div class="chips" id="e-cats" role="group" aria-label="Catégorie"></div></div>
-      <div class="two">
-        <div class="field"><label for="e-date">Date</label><input id="e-date" type="date" required></div>
-        <div class="field"><label for="e-note">Libellé (facultatif)</label><input id="e-note" maxlength="80" placeholder="Ex. Courses Lidl"></div>
-      </div>
+      <div class="field"><label for="e-note">Libellé</label><input id="e-note" maxlength="80" placeholder="Ex. Nourriture" autocomplete="off"></div>
+      <div class="chips" id="e-labels" aria-label="Suggestions de libellé"></div>
+      <div class="field"><label for="e-date">Date</label><input id="e-date" type="date" required></div>
       <div class="msg" id="e-msg" hidden></div>
       <button class="primary" type="submit" id="e-submit">Ajouter</button>
     </form>
@@ -372,7 +372,8 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
         <div class="slide"><label for="s-month">Versement mensuel</label><output id="s-month-o" class="num" for="s-month">100 €</output><input type="range" id="s-month" min="0" max="1000" step="10" value="100"></div>
         <div class="slide"><label for="s-years">Durée</label><output id="s-years-o" class="num" for="s-years">5 ans</output><input type="range" id="s-years" min="1" max="30" step="1" value="5"></div>
         <div class="field"><span class="flabel">Taux annuel</span><div class="chips" id="s-rates"></div></div>
-        <label class="check"><input type="checkbox" id="s-from" checked><span id="s-from-t">Partir de mon épargne actuelle</span></label>
+        <div class="field"><label for="s-start">Fonds de départ (€)</label><input id="s-start" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+        <div class="chips"><button type="button" class="dchip" id="s-use-saved"></button><button type="button" class="dchip" id="s-zero">Partir de zéro</button></div>
       </div>
       <div class="result">
         <div class="big"><span class="done num" id="r-total">0 €</span><span class="of" id="r-when"></span></div>
@@ -391,7 +392,7 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
 
   <section class="panel" id="p-stats" role="tabpanel" aria-labelledby="t-stats" hidden>
     <div class="box"><h2>Vue d'ensemble</h2><div class="kpis" id="kpis"></div></div>
-    <div class="box"><h2>Dépenses par mois</h2><p class="hint">6 derniers mois · pointillés : total des objectifs</p><div class="chartwrap" id="chart"></div></div>
+    <div class="box"><h2>Dépenses par mois</h2><p class="hint">6 derniers mois, prélèvements compris · pointillés : vos revenus</p><div class="chartwrap" id="chart"></div></div>
     <div class="box"><h2>Répartition du mois</h2><div id="shares" style="display:flex;flex-direction:column;gap:9px"></div></div>
   </section>
 
@@ -690,15 +691,16 @@ if (typeof document !== "undefined") (function () {
 
   /* Simulation : réglages propres à ce navigateur */
   const RATES = [[0, "Sans intérêts"], [1.7, "Livret A 1,7 %"], [3, "3 %"], [5, "5 %"]];
-  let sim = { monthly: 10000, years: 5, rate: 1.7, from: true };
-  try { const r = JSON.parse(localStorage.getItem(LS + "-sim") || "null"); if (r) sim = { ...sim, ...r }; } catch (e) {}
+  // start : fonds de départ en centimes ; absent = épargne actuelle.
+  let sim = { monthly: 10000, years: 5, rate: 1.7 };
+  try { const r = JSON.parse(localStorage.getItem(LS + "-sim") || "null"); if (r) { sim = { ...sim, ...r }; if (r.from === false && !Number.isFinite(r.start)) sim.start = 0; delete sim.from; } } catch (e) {}
   const saveSim = () => { try { localStorage.setItem(LS + "-sim", JSON.stringify(sim)); } catch (e) {} };
 
   /* Marge moyenne des 3 derniers mois terminés (objectif − dépensé), pour suggérer un versement réaliste. */
   function avgMargin() {
-    const ms = [1, 2, 3].map(k => ymShift(todayYm(), -k)).map(m => monthTotals(state, m)).filter(t => t.count > 0);
+    const ms = [1, 2, 3].map(k => ymShift(todayYm(), -k)).map(m => monthTotals(state, m)).filter(t => t.count > 0 && t.income > 0);
     if (!ms.length) return 0;
-    const avg = ms.reduce((s, t) => s + ((t.income || t.budget) - t.total), 0) / ms.length;
+    const avg = ms.reduce((s, t) => s + (t.income - t.total), 0) / ms.length;
     return Math.max(0, Math.floor(avg / 1000) * 1000);
   }
 
@@ -707,13 +709,17 @@ if (typeof document !== "undefined") (function () {
     $("#s-years").value = sim.years; $("#s-years-o").textContent = sim.years + (sim.years > 1 ? " ans" : " an");
     $("#s-rates").innerHTML = RATES.map(([v, l]) => `<button type="button" class="dchip" data-rate="${v}" aria-pressed="${v === sim.rate}">${l}</button>`).join("");
     const saved = savedTotal();
-    $("#s-from").checked = sim.from; $("#s-from-t").textContent = `Partir de mon épargne actuelle (${eurR(saved)})`;
+    const start = Number.isFinite(sim.start) ? sim.start : saved;
+    if (document.activeElement !== $("#s-start")) $("#s-start").value = start ? String(start / 100).replace(".", ",") : "";
+    $("#s-use-saved").textContent = `Mon épargne actuelle : ${eurR(saved)}`;
+    $("#s-use-saved").setAttribute("aria-pressed", String(start === saved && saved > 0));
+    $("#s-zero").setAttribute("aria-pressed", String(start === 0));
     const mg = avgMargin();
     $("#sim-tip").hidden = !(mg > 0 && mg !== sim.monthly);
     $("#sim-tip-t").textContent = `Ces derniers mois, il vous restait en moyenne ${eurR(mg)} par mois.`;
     $("#sim-tip-b").textContent = `Simuler ${eurR(mg)} / mois`; $("#sim-tip-b").dataset.v = mg;
 
-    const start = sim.from ? saved : 0, N = sim.years * 12;
+    const N = sim.years * 12;
     const pts = simulate(start, sim.monthly, sim.rate, N), end = pts[N];
     const endDate = new Date(); endDate.setMonth(endDate.getMonth() + N);
     $("#r-total").textContent = eurR(end.bal);
@@ -753,30 +759,16 @@ if (typeof document !== "undefined") (function () {
     $("#r-eta").innerHTML = rows.join("");
   }
 
-  function renderCats(T, tm) {
-    const box = $("#cats");
-    const rows = sorted().map(c => {
-      const spent = T.by[c.id] || 0, left = c.budget - spent, lv = level(spent, c.budget, tm.frac);
-      const w = c.budget ? Math.min(100, spent / c.budget * 100) : (spent ? 100 : 0);
-      const n = state.expenses.filter(e => e.cat === c.id && e.date.slice(0, 7) === view).length;
-      const tick = tm.kind === "current" ? `<i style="left:calc(${tm.frac * 100}% - 1px)"></i>` : "";
-      const edit = editing === c.id ? `
-        <form class="cat-edit" data-edit="${c.id}">
-          <div class="field"><label for="ce-n-${c.id}">Nom</label><input id="ce-n-${c.id}" value="${esc(c.name)}" maxlength="40"></div>
-          <div class="field"><label for="ce-b-${c.id}">€ / mois</label><input id="ce-b-${c.id}" inputmode="decimal" value="${(c.budget / 100).toString().replace(".", ",")}"></div>
-          <div class="row"><button type="button" class="sbtn del" data-del="${c.id}">Supprimer</button><span class="row"><button type="button" class="sbtn" data-cancel>Annuler</button><button class="sbtn" type="submit" style="font-weight:600">Enregistrer</button></span></div>
-        </form>` : "";
-      return `<div class="cat">
-        <div class="cat-top"><span class="cat-name">${esc(c.name)}</span>
-          <span class="cat-left num ${lv === "ok" ? "" : lv}">${left < 0 ? `<small>dépassé de</small>${eur(-left)}` : `<small>reste</small>${eur(left)}`}</span></div>
-        <div class="bar"><span class="${lv === "ok" ? "" : lv}" style="width:${w}%"></span>${tick}</div>
-        <div class="cat-foot"><span class="m num">${eur(spent)} / ${eur(c.budget)} · ${n} dépense${n > 1 ? "s" : ""}</span>
-          <span class="cat-acts"><button type="button" class="sbtn" data-add="${c.id}">+ Dépense</button><button type="button" class="sbtn" data-see="${c.id}">Voir</button><button type="button" class="sbtn" data-edit-open="${c.id}">Modifier</button></span></div>
-        ${edit}</div>`;
-    });
-    if (T.orphan) rows.push(`<div class="cat"><div class="cat-top"><span class="cat-name">Hors catégorie</span><span class="cat-left num">${eur(T.orphan)}</span></div><div class="cat-foot"><span>Dépenses d'une catégorie supprimée, comptées dans le total.</span></div></div>`);
-    box.innerHTML = rows.join("") || `<p class="empty">Aucune catégorie. Ajoutez-en une ci-dessous avec son objectif mensuel.</p>`;
-    $("#cats-total").textContent = eur(T.budget);
+  function renderCats() {
+    $("#cats").innerHTML = sorted().map(c => {
+      const n = state.debits.filter(d => d.cat === c.id && !d.until).length;
+      const row = `<div class="crow"><span class="cat-name">${esc(c.name)}</span><span class="row" style="align-items:center"><span class="m">${n} prélèvement${n > 1 ? "s" : ""}</span><button type="button" class="sbtn" data-edit-open="${c.id}">Modifier</button></span></div>`;
+      if (editing !== c.id) return row;
+      return row + `<form class="cedit" data-edit="${c.id}">
+        <div class="field"><label for="ce-n-${c.id}">Nom</label><input id="ce-n-${c.id}" value="${esc(c.name)}" maxlength="40"></div>
+        <div class="row"><button type="button" class="sbtn del" data-del="${c.id}">Supprimer</button><span class="row"><button type="button" class="sbtn" data-cancel>Annuler</button><button class="sbtn" type="submit" style="font-weight:600">Enregistrer</button></span></div>
+      </form>`;
+    }).join("") || `<p class="empty">Aucune catégorie. Ajoutez-en une ci-dessous.</p>`;
   }
 
   function renderDebits() {
@@ -801,19 +793,27 @@ if (typeof document !== "undefined") (function () {
     }).join("");
     $("#debits").innerHTML = groups || `<p class="empty">Aucun prélèvement. Ajoutez votre loyer, votre forfait, vos abonnements…</p>`;
     if (!cats.find(c => c.id === selDebitCat)) selDebitCat = cats[0] ? cats[0].id : "";
-    $("#d-cats").innerHTML = cats.map(c => `<button type="button" class="dchip" data-dcat="${c.id}" aria-pressed="${c.id === selDebitCat}">${esc(c.name)}</button>`).join("") || `<span class="empty">Créez d'abord une catégorie dans l'onglet Budgets.</span>`;
+    $("#d-cats").innerHTML = cats.map(c => `<button type="button" class="dchip" data-dcat="${c.id}" aria-pressed="${c.id === selDebitCat}">${esc(c.name)}</button>`).join("") || `<span class="empty">Créez d'abord une catégorie plus bas dans cet onglet.</span>`;
   }
 
+  /* Suggestions : Nourriture, Essence, puis vos libellés les plus utilisés. */
+  function labelSuggestions() {
+    const base = ["Nourriture", "Essence"], count = {};
+    for (const e of state.expenses) { const n = (e.note || "").trim(); if (n) count[n] = (count[n] || 0) + 1; }
+    const lower = base.map(s => s.toLowerCase());
+    const mine = Object.entries(count).filter(([n]) => !lower.includes(n.toLowerCase())).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([n]) => n);
+    return [...base, ...mine];
+  }
   function renderForm() {
-    const cats = sorted();
-    if (!cats.find(c => c.id === selCat)) selCat = cats[0] ? cats[0].id : "";
-    $("#e-cats").innerHTML = cats.map(c => `<button type="button" class="dchip" data-cat="${c.id}" aria-pressed="${c.id === selCat}">${esc(c.name)}</button>`).join("") || `<span class="empty">Créez d'abord une catégorie dans l'onglet Budgets.</span>`;
+    const cur = $("#e-note").value.trim().toLowerCase();
+    $("#e-labels").innerHTML = labelSuggestions().map(s => `<button type="button" class="dchip" data-label="${esc(s)}" aria-pressed="${s.toLowerCase() === cur}">${esc(s)}</button>`).join("");
     updateSubmit();
   }
   function updateSubmit() {
-    const a = parseAmount($("#e-amount").value);
-    $("#e-submit").textContent = a ? `Ajouter ${eur(a)} · ${catName(selCat)}` : "Ajouter";
+    const a = parseAmount($("#e-amount").value), n = $("#e-note").value.trim();
+    $("#e-submit").textContent = a ? `Ajouter ${eur(a)}${n ? " · " + n : ""}` : "Ajouter";
     document.querySelectorAll("#e-quick .dchip").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.v) === a)));
+    document.querySelectorAll("#e-labels .dchip").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.label.toLowerCase() === n.toLowerCase())));
   }
 
   function renderList() {
@@ -825,7 +825,7 @@ if (typeof document !== "undefined") (function () {
     $("#list").innerHTML = items.map(e => {
       const d = new Date(e.date + "T12:00:00");
       return `<div class="item"><div class="date"><b>${d.getDate()}</b>${d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}</div>
-        <div class="what"><div class="t">${esc(e.note || catName(e.cat))}</div><div class="s">${esc(catName(e.cat))}</div></div>
+        <div class="what"><div class="t">${esc(e.note || catName(e.cat))}</div>${e.note && state.categories.some(c => c.id === e.cat) ? `<div class="s">${esc(catName(e.cat))}</div>` : ""}</div>
         <div class="right"><span class="amt num">${eur(e.amount)}</span><button type="button" class="sbtn del" data-x="${e.id}">Supprimer</button></div></div>`;
     }).join("") || `<p class="empty">${filterCat ? "Aucune dépense dans cette catégorie ce mois-ci." : "Aucune dépense ce mois-ci."}</p>`;
   }
@@ -833,27 +833,32 @@ if (typeof document !== "undefined") (function () {
 
   function renderStats(T, tm) {
     const prev = monthTotals(state, ymShift(view, -1));
-    const top = Object.entries(T.by).sort((a, b) => b[1] - a[1])[0];
+    // Répartition : prélèvements par catégorie, dépenses par libellé
+    const acc = {}, addTo = (k, v) => { acc[k] = (acc[k] || 0) + v; };
+    for (const d of activeDebits(state, view)) addTo(catName(d.cat), d.amount);
+    for (const e of state.expenses) if (e.date.slice(0, 7) === view) addTo(e.note || catName(e.cat), e.amount);
+    const parts = Object.entries(acc).filter(p => p[1] > 0).sort((a, b) => b[1] - a[1]);
+    const top = parts[0];
     const diff = prev.total ? Math.round((T.total - prev.total) / prev.total * 100) : null;
     const days = tm.kind === "current" ? tm.elapsed : tm.dim;
     const kp = [
       [eurR(T.total), "sortis ce mois (prélèvements compris)"],
       [tm.kind === "future" ? "–" : eur(Math.round(T.total / Math.max(1, days))), "en moyenne par jour"],
       [diff === null ? "–" : (diff > 0 ? "+" : "") + diff + " %", `vs ${monthName(ymShift(view, -1)).split(" ")[0]} (${eurR(prev.total)})`],
-      [top ? esc(catName(top[0])) : "–", top ? `plus gros poste · ${eur(top[1])}` : "plus gros poste"]
+      [top ? esc(top[0]) : "–", top ? `plus gros poste · ${eur(top[1])}` : "plus gros poste"]
     ];
     $("#kpis").innerHTML = kp.map(([b, s]) => `<div class="kpi"><b class="num">${b}</b><span>${s}</span></div>`).join("");
 
     // Graphique 6 mois
     const months = [-5, -4, -3, -2, -1, 0].map(k => ymShift(view, k));
     const vals = months.map(m => monthTotals(state, m).total);
-    const budget = T.budget;
+    const budget = T.income;
     const W = 600, H = 220, L = 46, R = 10, Tp = 22, B = 28;
     const max = Math.max(budget, ...vals, 1) * 1.12;
     const step = niceStep(max / 4);
     const y = v => Tp + (H - Tp - B) * (1 - v / max);
     const bw = (W - L - R) / months.length;
-    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:420px" role="img" aria-label="Dépenses des 6 derniers mois comparées à l'objectif">`;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:420px" role="img" aria-label="Sorties des 6 derniers mois comparées aux revenus">`;
     for (let g = 0; g <= max; g += step) svg += `<line class="g" x1="${L}" x2="${W - R}" y1="${y(g)}" y2="${y(g)}"/><text x="${L - 6}" y="${y(g) + 4}" text-anchor="end">${nf0.format(g / 100)}</text>`;
     months.forEach((m, i) => {
       const x = L + i * bw + bw * .2, w = bw * .6, v = vals[i];
@@ -865,7 +870,6 @@ if (typeof document !== "undefined") (function () {
     $("#chart").innerHTML = svg + "</svg>";
 
     // Répartition
-    const parts = sorted().map(c => [c.name, T.by[c.id] || 0]).concat(T.orphan ? [["Hors catégorie", T.orphan]] : []).filter(p => p[1] > 0).sort((a, b) => b[1] - a[1]);
     $("#shares").innerHTML = parts.map(([n, v]) => `<div class="share"><span class="n">${esc(n)}</span><span class="tr"><span style="width:${v / T.total * 100}%"></span></span><span class="v num">${Math.round(v / T.total * 100)} %</span></div>`).join("") || `<p class="empty">Rien de dépensé ce mois-ci.</p>`;
   }
   function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw))); const n = raw / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
@@ -894,10 +898,8 @@ if (typeof document !== "undefined") (function () {
   /* ---------- Catégories ---------- */
   $("#cats").addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
-    if (b.dataset.editOpen) { editing = editing === b.dataset.editOpen ? "" : b.dataset.editOpen; render(); const i = $(`#ce-b-${editing}`); if (i) i.focus(); return; }
-    if (b.dataset.cancel !== undefined) { editing = ""; render(); return; }
-    if (b.dataset.add) { selCat = b.dataset.add; setTab("log"); render(); $("#e-amount").focus(); return; }
-    if (b.dataset.see) { filterCat = b.dataset.see; setTab("log"); render(); return; }
+    if (b.dataset.editOpen) { editing = editing === b.dataset.editOpen ? "" : b.dataset.editOpen; renderCats(); const i = $(`#ce-n-${editing}`); if (i) i.focus(); return; }
+    if (b.dataset.cancel !== undefined) { editing = ""; renderCats(); return; }
     if (b.dataset.del) {
       if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer"; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = "Supprimer"; } }, 3000); return; }
       const c = state.categories.find(x => x.id === b.dataset.del);
@@ -909,48 +911,46 @@ if (typeof document !== "undefined") (function () {
   $("#cats").addEventListener("submit", e => {
     e.preventDefault();
     const f = e.target.closest("form[data-edit]"); if (!f) return;
-    const c = state.categories.find(x => x.id === f.dataset.edit);
-    const name = $(`#ce-n-${c.id}`).value.trim(), raw = $(`#ce-b-${c.id}`).value.trim();
-    const budget = raw === "0" ? 0 : parseAmount(raw);
-    if (!name || (!budget && raw !== "0")) { toast("Indiquez un nom et un objectif en euros (ex. 80 ou 72,50)."); return; }
-    c.name = name; c.budget = budget; c.updated = nowIso(); editing = ""; save(); render();
-    toast(`Objectif ${name} : ${eur(budget)} par mois`);
+    const c = state.categories.find(x => x.id === f.dataset.edit), name = $(`#ce-n-${c.id}`).value.trim();
+    if (!name) { toast("Donnez un nom à la catégorie."); return; }
+    c.name = name; c.updated = nowIso(); editing = ""; save(); render();
+    toast(`Catégorie renommée : ${name}`);
   });
   $("#f-cat").addEventListener("submit", e => {
     e.preventDefault();
-    const name = $("#c-name").value.trim(), raw = $("#c-budget").value.trim(), budget = raw === "0" ? 0 : parseAmount(raw), m = $("#c-msg");
+    const name = $("#c-name").value.trim(), m = $("#c-msg");
     if (!name) { m.hidden = false; m.textContent = "Donnez un nom à la catégorie."; return; }
-    if (!budget && raw !== "0") { m.hidden = false; m.textContent = "Indiquez l'objectif mensuel en euros, par exemple 50 ou 42,50."; return; }
     if (state.categories.some(c => c.name.toLowerCase() === name.toLowerCase())) { m.hidden = false; m.textContent = `La catégorie « ${name} » existe déjà.`; return; }
     m.hidden = true;
     const t = nowIso(), order = Math.max(0, ...state.categories.map(c => c.order)) + 1;
-    state.categories.push({ id: "c" + uid(), name, budget, order, created: t, updated: t });
-    $("#c-name").value = ""; $("#c-budget").value = ""; save(); render();
+    state.categories.push({ id: "c" + uid(), name, budget: 0, order, created: t, updated: t });
+    $("#c-name").value = ""; selDebitCat = state.categories[state.categories.length - 1].id; save(); render();
     toast(`Catégorie « ${name} » ajoutée`);
   });
 
   /* ---------- Dépenses ---------- */
   $("#e-quick").innerHTML = [5, 10, 20, 50].map(v => `<button type="button" class="dchip" data-v="${v * 100}">${v} €</button>`).join("");
   $("#e-quick").addEventListener("click", e => { const b = e.target.closest("[data-v]"); if (!b) return; $("#e-amount").value = String(Number(b.dataset.v) / 100); updateSubmit(); });
-  $("#e-cats").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (!b) return; selCat = b.dataset.cat; renderForm(); });
+  $("#e-labels").addEventListener("click", e => { const b = e.target.closest("[data-label]"); if (!b) return; $("#e-note").value = b.dataset.label; updateSubmit(); if (!parseAmount($("#e-amount").value)) $("#e-amount").focus(); });
+  $("#e-note").addEventListener("input", updateSubmit);
   $("#e-amount").addEventListener("input", updateSubmit);
   $("#f-exp").addEventListener("submit", e => {
     e.preventDefault();
     const amount = parseAmount($("#e-amount").value), date = $("#e-date").value, m = $("#e-msg");
     if (!amount) { m.hidden = false; m.textContent = "Indiquez un montant, par exemple 12,50."; $("#e-amount").focus(); return; }
-    if (!selCat) { m.hidden = false; m.textContent = "Créez d'abord une catégorie dans l'onglet Budgets."; return; }
+    const note = $("#e-note").value.trim();
+    if (!note) { m.hidden = false; m.textContent = "Indiquez un libellé, par exemple Nourriture ou Essence."; $("#e-note").focus(); return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { m.hidden = false; m.textContent = "Choisissez une date."; return; }
     m.hidden = true;
     const t = nowIso();
-    state.expenses.push({ id: "e" + uid(), date, amount, cat: selCat, note: $("#e-note").value.trim(), created: t, updated: t });
+    state.expenses.push({ id: "e" + uid(), date, amount, cat: "", note, created: t, updated: t });
     save();
-    const c = state.categories.find(x => x.id === selCat), ym = date.slice(0, 7);
+    const ym = date.slice(0, 7);
     if (ym !== view) view = ym;
     $("#e-amount").value = ""; $("#e-note").value = "";
     render();
-    const T = monthTotals(state, ym), left = c.budget - (T.by[c.id] || 0);
-    if (T.income) { const r = T.income - T.total; toast(r >= 0 ? `${eur(amount)} ajoutés · il vous reste ${eur(r)} ce mois-ci` : `${eur(amount)} ajoutés · vous êtes à −${eur(-r)} ce mois-ci`); return; }
-    toast(left >= 0 ? `${eur(amount)} ajoutés · il reste ${eur(left)} en ${c.name}` : `${eur(amount)} ajoutés · ${c.name} dépasse de ${eur(-left)}`);
+    const T = monthTotals(state, ym), r = T.income - T.total;
+    toast(!T.income ? `${note} : ${eur(amount)} ajoutés` : r >= 0 ? `${note} : ${eur(amount)} · il vous reste ${eur(r)} ce mois-ci` : `${note} : ${eur(amount)} · vous êtes à −${eur(-r)} ce mois-ci`);
   });
   $("#list").addEventListener("click", e => {
     const b = e.target.closest("[data-x]"); if (!b) return;
@@ -1013,7 +1013,9 @@ if (typeof document !== "undefined") (function () {
   $("#s-month").addEventListener("input", e => { sim.monthly = Number(e.target.value) * 100; saveSim(); renderSim(); });
   $("#s-years").addEventListener("input", e => { sim.years = Number(e.target.value); saveSim(); renderSim(); });
   $("#s-rates").addEventListener("click", e => { const b = e.target.closest("[data-rate]"); if (!b) return; sim.rate = Number(b.dataset.rate); saveSim(); renderSim(); });
-  $("#s-from").addEventListener("change", e => { sim.from = e.target.checked; saveSim(); renderSim(); });
+  $("#s-start").addEventListener("input", e => { const v = e.target.value.trim(); sim.start = v === "" || v === "0" ? 0 : parseAmount(v); saveSim(); renderSim(); });
+  $("#s-use-saved").addEventListener("click", () => { sim.start = savedTotal(); saveSim(); renderSim(); });
+  $("#s-zero").addEventListener("click", () => { sim.start = 0; saveSim(); renderSim(); });
   $("#sim-tip-b").addEventListener("click", e => { sim.monthly = Math.min(100000, Number(e.target.dataset.v)); saveSim(); renderSim(); });
 
   /* ---------- Revenus ---------- */
@@ -1043,7 +1045,7 @@ if (typeof document !== "undefined") (function () {
     if (!name) { m.hidden = false; m.textContent = "Donnez un nom au prélèvement, par exemple Loyer."; return; }
     if (!amount) { m.hidden = false; m.textContent = "Indiquez le montant en euros, par exemple 450."; return; }
     if (rawDay && !day) { m.hidden = false; m.textContent = "Le jour doit être un nombre entre 1 et 31, ou laissez vide."; return; }
-    if (!selDebitCat) { m.hidden = false; m.textContent = "Créez d'abord une catégorie dans l'onglet Budgets."; return; }
+    if (!selDebitCat) { m.hidden = false; m.textContent = "Créez d'abord une catégorie plus bas dans cet onglet."; return; }
     m.hidden = true;
     const t = nowIso();
     state.debits.push({ id: "d" + uid(), name, amount, cat: selDebitCat, day, since: view, until: "", created: t, updated: t });

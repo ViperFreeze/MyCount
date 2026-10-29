@@ -4,10 +4,10 @@ Application web de suivi de budget personnel, en un seul fichier HTML, sans serv
 
 ## Fonctionnalités
 
-- **Mois** (accueil) : en gros, ce qui reste ce mois-ci (revenus − prélèvements − dépenses), les prélèvements mensuels rangés par catégorie, la saisie rapide des dépenses et leur historique.
-- **Budgets** : un budget mensuel par catégorie (prélèvements compris), avec le reste et une jauge de rythme sur le mois.
+- **Mois** (accueil) : en gros, ce qui reste ce mois-ci (revenus − prélèvements − dépenses), puis la saisie des dépenses avec un libellé (suggestions : Nourriture, Essence et vos libellés habituels) et leur historique.
+- **Prélèvements** : les prélèvements mensuels rangés par catégorie, et la gestion des catégories.
 - **Stats** : comparaison des dépenses sur les 6 derniers mois.
-- **Épargne** : objectifs d'épargne avec échéance et versement mensuel suggéré, dépôts et retraits, et simulateur (versement, durée, taux, dont Livret A) avec date d'atteinte prévue pour chaque objectif.
+- **Épargne** : objectifs d'épargne avec échéance et versement mensuel suggéré, dépôts et retraits, et simulateur (fonds de départ, versement, durée, taux, dont Livret A) avec date d'atteinte prévue pour chaque objectif.
 - **Synchronisation** entre appareils par copier-coller d'une sauvegarde JSON, fusionnée sans doublons.
 
 Au premier lancement, l'appli démarre vide avec des catégories par défaut, à ajuster dans Budgets.
