@@ -111,9 +111,16 @@ button,input,select,textarea{font:inherit;color:inherit}
 .dgroup{display:flex;flex-direction:column;gap:2px;padding:12px 0;border-top:1px solid var(--line)}
 .dgroup:first-child{border-top:0;padding-top:2px}
 .dgroup .cat-top{margin-bottom:4px}
-.drow{display:grid;grid-template-columns:40px 1fr auto auto auto;gap:10px;align-items:center;padding:5px 0;font-size:14px}
-.dday{font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase}
-.dname{overflow-wrap:anywhere;min-width:0}
+.drow{display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;gap:6px 10px;align-items:center;padding:6px 0;font-size:14px}
+.dday{font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase;white-space:nowrap}
+.dname{overflow-wrap:break-word;hyphens:auto;min-width:0}
+.dacts{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+/* Téléphone : libellé et montant sur la 1re ligne, statut et « Modifier » en dessous, pour laisser toute la largeur au libellé. */
+@media (max-width:520px){
+  .drow{grid-template-columns:44px minmax(0,1fr) auto;padding:8px 0;border-top:1px dashed var(--line)}
+  .dgroup .cat-top+.drow{border-top:0}
+  .drow .dacts{grid-column:2/-1}
+}
 .dform{display:flex;flex-direction:column;gap:12px}
 .cat-add{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;border-top:1px solid var(--line);padding-top:12px}
 .crow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
@@ -157,8 +164,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 textarea{width:100%;min-height:84px;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:var(--sunk);font-family:var(--f-mono);font-size:12px;resize:vertical}
 
 /* Tabs */
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
-.tab{border:0;background:none;padding:9px 4px;border-radius:9px;font-weight:600;font-size:14px;cursor:pointer;color:var(--muted)}
+/* Onglets : ils se partagent la largeur ; sur un petit écran la barre défile au doigt plutôt que de faire déborder les libellés. */
+.tabs{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1 0 auto;border:0;background:none;padding:9px 12px;border-radius:9px;font-weight:600;font-size:14px;cursor:pointer;color:var(--muted);white-space:nowrap}
+@media (max-width:420px){.tab{font-size:13px;padding:8px 10px}}
 .tab[aria-selected="true"]{background:var(--ink);color:var(--bg)}
 .panel{display:flex;flex-direction:column;gap:16px}
 .box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px}
@@ -234,6 +244,21 @@ textarea{width:100%;min-height:84px;padding:10px 11px;border:1px solid var(--lin
 .kind button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
 .check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)} .check input{width:18px;height:18px;accent-color:var(--accent)}
 .filter{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;background:var(--accent-soft);border-radius:8px;padding:6px 6px 6px 12px}
+
+/* Historique : toutes les opérations, tous mois confondus */
+.hsearch{display:flex;flex-direction:column;gap:10px}
+.hsearch input[type=search]{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:var(--sunk);min-height:42px}
+.hsearch input[type=search]:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.hsum{font-size:13px;color:var(--muted)}
+.hsum b{font-family:var(--f-mono);font-weight:500;color:var(--ink)} .hsum b.in{color:var(--ok)}
+.hmonth{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:16px 0 4px;border-bottom:2px solid var(--ink)}
+.hmonth:first-child{padding-top:0}
+.hmonth h3{font-size:16px;font-stretch:90%;font-weight:700;text-transform:capitalize}
+.hmonth span{font-family:var(--f-mono);font-size:12px;color:var(--muted);white-space:nowrap}
+.hlist .item{grid-template-columns:44px minmax(0,1fr) auto}
+.hlist .item+.item{border-top:1px solid var(--line)}
+.hlist .hmonth+.item{border-top:0}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.mut{background:var(--sunk);color:var(--muted)}
 
 /* Stats */
 .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
@@ -389,6 +414,7 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
     <button class="tab" role="tab" id="t-log" aria-controls="p-log" aria-selected="true">Mois</button>
     <button class="tab" role="tab" id="t-budgets" aria-controls="p-budgets" aria-selected="false">Prélèvements</button>
     <button class="tab" role="tab" id="t-save" aria-controls="p-save" aria-selected="false">Épargne</button>
+    <button class="tab" role="tab" id="t-hist" aria-controls="p-hist" aria-selected="false">Historique</button>
     <button class="tab" role="tab" id="t-stats" aria-controls="p-stats" aria-selected="false">Stats</button>
   </nav>
 
@@ -489,6 +515,25 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
       <h2>Prévisions</h2>
       <p class="hint" id="fc-sum"></p>
       <div class="eta" id="fc"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-hist" role="tabpanel" aria-labelledby="t-hist" hidden>
+    <div class="box">
+      <h2>Historique des transactions</h2>
+      <p class="hint">Toutes vos opérations, tous mois confondus : dépenses, crédits et prélèvements.</p>
+      <div class="hsearch">
+        <input type="search" id="h-q" placeholder="Rechercher un libellé, une catégorie…" autocomplete="off" aria-label="Rechercher dans l'historique">
+        <div class="chips" id="h-kind" role="group" aria-label="Type d'opération">
+          <button type="button" class="dchip" data-hk="" aria-pressed="true">Tout</button>
+          <button type="button" class="dchip" data-hk="out" aria-pressed="false">Dépenses</button>
+          <button type="button" class="dchip" data-hk="in" aria-pressed="false">Crédits</button>
+          <button type="button" class="dchip" data-hk="debit" aria-pressed="false">Prélèvements</button>
+        </div>
+      </div>
+      <div class="hsum" id="h-sum" aria-live="polite"></div>
+      <div class="list hlist" id="h-list"></div>
+      <button type="button" class="secondary" id="h-more" hidden>Voir plus</button>
     </div>
   </section>
 
@@ -805,6 +850,7 @@ if (typeof document !== "undefined") (function () {
     renderList();
     renderStats(T, tm);
     renderSavings();
+    renderHistory();
   }
 
   /* ---------- Épargne : un prélèvement mensuel (identifiant fixe « epargne ») ---------- */
@@ -888,13 +934,13 @@ if (typeof document !== "undefined") (function () {
     const total = list.reduce((s, d) => s + d.amount, 0);
     $("#d-sum").innerHTML = `${eur(total)}<small>par mois</small>`;
     const sd = list.find(d => d.id === SAVE_ID);
-    const saveGroup = sd ? `<div class="dgroup"><div class="cat-top"><span class="cat-name">Épargne</span><span class="amt num">${eur(sd.amount)}</span></div><div class="drow"><span class="dday">${sd.day ? "le " + sd.day : ""}</span><span class="dname">Vers mon épargne</span><span class="amt num">${eur(sd.amount)}</span>${debitSt(sd)}<button type="button" class="sbtn" data-gosave>Modifier</button></div></div>` : "";
+    const saveGroup = sd ? `<div class="dgroup"><div class="cat-top"><span class="cat-name">Épargne</span><span class="amt num">${eur(sd.amount)}</span></div><div class="drow"><span class="dday">${sd.day ? "le " + sd.day : ""}</span><span class="dname">Vers mon épargne</span><span class="amt num">${eur(sd.amount)}</span><span class="dacts">${debitSt(sd)}<button type="button" class="sbtn" data-gosave>Modifier</button></span></div></div>` : "";
     const groups = saveGroup + cats.map(c => [c.id, c.name]).concat([["", "Hors catégorie"]]).map(([id, name]) => {
       const ds = list.filter(d => d.id !== SAVE_ID && (id ? d.cat === id : !cats.some(c => c.id === d.cat))).sort((a, b) => (a.day || 99) - (b.day || 99) || a.name.localeCompare(b.name, "fr"));
       if (!ds.length) return "";
       const sum = ds.reduce((s, d) => s + d.amount, 0);
       return `<div class="dgroup"><div class="cat-top"><span class="cat-name">${esc(name)}</span><span class="amt num">${eur(sum)}</span></div>` + ds.map(d => {
-        const row = `<div class="drow"><span class="dday">${d.day ? "le " + d.day : ""}</span><span class="dname">${esc(d.name)}</span><span class="amt num">${eur(d.amount)}</span>${debitSt(d)}<button type="button" class="sbtn" data-dedit="${d.id}">Modifier</button></div>`;
+        const row = `<div class="drow"><span class="dday">${d.day ? "le " + d.day : ""}</span><span class="dname">${esc(d.name)}</span><span class="amt num">${eur(d.amount)}</span><span class="dacts">${debitSt(d)}<button type="button" class="sbtn" data-dedit="${d.id}">Modifier</button></span></div>`;
         if (editDebit !== d.id) return row;
         return row + `<form class="dedit" data-dform="${d.id}">
           <div class="field"><label for="de-n-${d.id}">Nom</label><input id="de-n-${d.id}" value="${esc(d.name)}" maxlength="40"></div>
@@ -1030,6 +1076,59 @@ if (typeof document !== "undefined") (function () {
     }).join("");
   }
 
+  /* ---------- Historique : toutes les opérations, du plus récent au plus ancien ---------- */
+  const H_PAGE = 50;
+  let hKind = "", hQuery = "", hShown = H_PAGE;
+  function historyRows() {
+    const rows = [], cur = todayYm(), today = ymd(new Date());
+    for (const e of state.expenses) {
+      const cin = e.kind === "in";
+      rows.push({ date: e.date, name: e.note || catName(e.cat), cat: state.categories.some(c => c.id === e.cat) ? catName(e.cat) : "", type: cin ? "in" : "out",
+        amount: e.amount, st: e.pending ? (cin ? "à recevoir" : "en attente") : "", stc: "", created: e.created || "" });
+    }
+    // Prélèvements : un par mois, depuis leur création jusqu'à aujourd'hui (pas les mois à venir).
+    for (const d of state.debits) {
+      const end = d.until && d.until < cur ? d.until : cur;
+      for (let ym = d.since, i = 0; ym <= end && i < 600; ym = ymShift(ym, 1), i++) {
+        const dt = debitDate(d, ym);
+        let st = "", stc = "";
+        if (ym === cur) { if (d.done[ym]) { st = "débité"; stc = "ok"; } else if (dt > today) { st = "à venir"; stc = "mut"; } else { st = "à valider"; } }
+        rows.push({ date: dt, name: d.id === SAVE_ID ? "Vers mon épargne" : d.name, cat: d.id === SAVE_ID ? "Épargne" : (state.categories.some(c => c.id === d.cat) ? catName(d.cat) : ""), type: "debit", amount: d.amount, st, stc, created: "" });
+      }
+    }
+    return rows.sort((a, b) => b.date.localeCompare(a.date) || b.created.localeCompare(a.created) || a.name.localeCompare(b.name, "fr"));
+  }
+  function renderHistory() {
+    const q = labelKey(hQuery);
+    const all = historyRows().filter(r => (!hKind || r.type === hKind) && (!q || labelKey(r.name).includes(q) || labelKey(r.cat).includes(q)));
+    const out = all.filter(r => r.type !== "in").reduce((s, r) => s + r.amount, 0), inn = all.filter(r => r.type === "in").reduce((s, r) => s + r.amount, 0);
+    document.querySelectorAll("#h-kind .dchip").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.hk === hKind)));
+    $("#h-sum").innerHTML = all.length
+      ? `${all.length} opération${all.length > 1 ? "s" : ""}${out ? ` · sorties <b>−${eur(out)}</b>` : ""}${inn ? ` · entrées <b class="in">+${eur(inn)}</b>` : ""}`
+      : "";
+    const page = all.slice(0, hShown);
+    // Total par mois, calculé sur tous les résultats du filtre (pas seulement ceux affichés).
+    const byMonth = {};
+    for (const r of all) { const k = r.date.slice(0, 7); byMonth[k] = (byMonth[k] || 0) + (r.type === "in" ? r.amount : -r.amount); }
+    let html = "", lastYm = "";
+    for (const r of page) {
+      const ym = r.date.slice(0, 7);
+      if (ym !== lastYm) { const n = byMonth[ym]; html += `<div class="hmonth"><h3>${monthName(ym)}</h3><span>${n < 0 ? "−" : "+"}${eur(Math.abs(n))}</span></div>`; lastYm = ym; }
+      const d = new Date(r.date + "T12:00:00"), cin = r.type === "in";
+      const sub = [r.type === "debit" ? "Prélèvement" : cin ? "Crédit" : "", r.cat ? esc(r.cat) : ""].filter(Boolean).join(" · ");
+      html += `<div class="item"><div class="date"><b>${d.getDate()}</b>${d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}</div>
+        <div class="what"><div class="t">${esc(r.name)}</div>${sub || r.st ? `<div class="s">${sub}${r.st ? `${sub ? " " : ""}<span class="pill${r.stc ? " " + r.stc : ""}">${r.st}</span>` : ""}</div>` : ""}</div>
+        <div class="right"><span class="amt num${cin ? " in" : ""}">${cin ? "+" : "−"}${eur(r.amount)}</span></div></div>`;
+    }
+    $("#h-list").innerHTML = html || `<p class="empty">${hQuery || hKind ? "Aucune opération ne correspond." : "Aucune opération pour l'instant. Vos dépenses, crédits et prélèvements apparaîtront ici."}</p>`;
+    const more = $("#h-more"), rest = all.length - page.length;
+    more.hidden = rest <= 0;
+    more.textContent = `Voir plus (${rest} restante${rest > 1 ? "s" : ""})`;
+  }
+  $("#h-q").addEventListener("input", e => { hQuery = e.target.value.trim(); hShown = H_PAGE; renderHistory(); });
+  $("#h-kind").addEventListener("click", e => { const b = e.target.closest("[data-hk]"); if (!b) return; hKind = b.dataset.hk; hShown = H_PAGE; renderHistory(); });
+  $("#h-more").addEventListener("click", () => { hShown += H_PAGE; renderHistory(); });
+
   function renderStats(T, tm) {
     const prev = monthTotals(state, ymShift(view, -1));
     // Répartition : prélèvements par catégorie, dépenses par libellé
@@ -1074,9 +1173,12 @@ if (typeof document !== "undefined") (function () {
   function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw))); const n = raw / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
 
   /* ---------- Onglets ---------- */
-  const tabs = ["log", "budgets", "save", "stats"];
+  const tabs = ["log", "budgets", "save", "hist", "stats"];
   function setTab(t) {
     tabs.forEach(k => { $("#t-" + k).setAttribute("aria-selected", String(k === t)); $("#p-" + k).hidden = k !== t; });
+    // Petit écran : l'onglet choisi reste visible dans la barre qui défile.
+    const tb = $("#t-" + t), bar = tb.parentElement;
+    if (bar.scrollWidth > bar.clientWidth) bar.scrollTo({ left: tb.offsetLeft - (bar.clientWidth - tb.offsetWidth) / 2, behavior: "smooth" });
     try { localStorage.setItem(LS + "-tab2", t); } catch (e) {}
   }
   tabs.forEach(k => $("#t-" + k).addEventListener("click", () => setTab(k)));
