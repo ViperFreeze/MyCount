@@ -95,6 +95,15 @@ button,input,select,textarea{font:inherit;color:inherit}
 .left-label{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:-10px}
 .income{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
 .income b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
+/* Le calcul de ce qui reste, ligne par ligne */
+.calc{border:1px solid var(--line);border-radius:var(--r);padding:4px 14px;font-size:14px}
+.calc .cl{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line)}
+.calc .cl:first-child{border-top:0}
+.calc .cl span:first-child{flex:1;min-width:0}
+.calc .cl small{display:block;font-size:12px;color:var(--muted)}
+.calc .v{font-family:var(--f-mono);font-weight:500;white-space:nowrap}
+.calc .v.in{color:var(--ok)} .calc .v.wait{color:var(--warn)}
+.calc .tot{border-top:2px solid var(--ink);font-weight:700} .calc .tot .v{font-weight:700}
 .income-form{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}
 .dgroup{display:flex;flex-direction:column;gap:2px;padding:12px 0;border-top:1px solid var(--line)}
 .dgroup:first-child{border-top:0;padding-top:2px}
@@ -363,19 +372,15 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
 
     <div class="left-label">Il vous reste ce mois-ci</div>
     <div class="big"><span class="done num" id="f-left">–</span><span class="chip" id="f-status" hidden></span></div>
-    <div class="income" id="income-view"><span id="income-t"></span><button type="button" class="sbtn" id="income-edit">Modifier</button></div>
+    <div class="income" id="income-view"><span id="income-t"></span></div>
     <form class="income-form" id="income-form" hidden novalidate>
       <div class="field"><label for="income-in">Vos revenus par mois (salaire, bourse, aides…)</label><input id="income-in" inputmode="decimal" placeholder="1 200"></div>
       <button class="primary" type="submit">Enregistrer</button>
     </form>
     <div class="gauge" aria-hidden="true"><div class="fd" id="g-debit"></div><div class="f" id="g-fill"></div></div>
     <div class="scale"><span id="sc-a"></span><span id="sc-b"></span></div>
-    <div class="figs">
-      <div class="fig"><span class="label">Déjà débité</span><b class="num" id="k-done">0 €</b></div>
-      <div class="fig"><span class="label">À débiter</span><b class="num" id="k-pend">0 €</b></div>
-      <div class="fig"><span class="label">Crédits</span><b class="num" id="k-in">0 €</b></div>
-    </div>
-  </section>
+    <div class="calc" id="calc"></div>
+    </section>
 
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button class="tab" role="tab" id="t-log" aria-controls="p-log" aria-selected="true">Mois</button>
@@ -751,10 +756,8 @@ if (typeof document !== "undefined") (function () {
     st.hidden = !has; st.className = "chip " + lv;
     st.textContent = lv === "bad" ? "Dans le rouge" : lv === "warn" ? "Rythme trop élevé" : tm.kind === "future" ? "Prévision" : "Ça va";
     const hasInc = T.income > 0;
-    $("#income-t").innerHTML = hasInc ? `Revenus du mois : <b>${eur(T.income)}</b>${T.credits ? ` + crédits <b>${eur(T.credits)}</b>` : ""}` : "Indiquez vos revenus pour savoir ce qui vous reste.";
-    $("#income-edit").textContent = hasInc ? "Modifier" : "Indiquer";
-    $("#income-form").hidden = hasInc;
-    $("#income-edit").hidden = !hasInc;
+    $("#income-t").textContent = "Indiquez vos revenus pour savoir ce qui vous reste.";
+    $("#income-view").hidden = $("#income-form").hidden = hasInc;
 
     const base = Math.max(inTot, T.total, 1);
     const wd = T.debits / base * 100, we = T.spent / base * 100;
@@ -763,9 +766,17 @@ if (typeof document !== "undefined") (function () {
     gf.className = "f" + (lv === "bad" ? " bad" : lv === "warn" ? " warn" : "");
     $("#sc-a").textContent = has ? `${nf0.format(Math.round(T.total / inTot * 100))} % des revenus utilisés` : `${eurR(T.total)} sortis`;
     $("#sc-b").textContent = has ? eurR(inTot) : "";
-    $("#k-done").textContent = eurR(T.done);
-    $("#k-pend").textContent = eurR(T.pendOut);
-    $("#k-in").textContent = (T.credits ? "+" : "") + eurR(T.credits);
+    // Ce qui reste = revenus + crédits − ce qui est déjà débité − ce qui va encore partir (prélèvements à venir, dépenses en attente).
+    const pendDeb = activeDebits(state, view).filter(d => !d.done[view] && view >= todayYm()).reduce((s, d) => s + d.amount, 0), pendExp = T.pendOut - pendDeb;
+    const waitSub = [pendDeb ? `${eur(pendDeb)} de prélèvements` : "", pendExp ? `${eur(pendExp)} de dépenses en attente` : ""].filter(Boolean).join(" + ");
+    const line = (label, v, cls, sub, extra) => `<div class="cl${cls === "tot" ? " tot" : ""}"><span>${label}${sub ? `<small>${sub}</small>` : ""}</span>${extra || ""}<span class="v ${cls === "tot" ? "" : cls || ""}">${v}</span></div>`;
+    $("#calc").innerHTML =
+      line("Revenus du mois", eur(T.income), "", "", `<button type="button" class="sbtn" id="income-edit">Modifier</button>`) +
+      (T.credits ? line("Crédits", "+" + eur(T.credits), "in", T.pendIn ? `dont ${eur(T.pendIn)} à recevoir` : "") : "") +
+      line("Déjà débité", (T.done ? "−" : "") + eur(T.done)) +
+      (T.pendOut || tm.kind !== "past" ? line(tm.kind === "past" ? "Pas encore validé" : "À venir", (T.pendOut ? "−" : "") + eur(T.pendOut), T.pendOut ? "wait" : "", waitSub) : "") +
+      line(tm.kind === "past" ? "Il vous est resté" : "Il vous reste", (left < 0 ? "−" : "") + eur(Math.abs(left)), "tot");
+    $("#calc").hidden = !has;
 
     renderDebits();
     renderPending();
@@ -1227,7 +1238,7 @@ if (typeof document !== "undefined") (function () {
   });
 
   /* ---------- Revenus ---------- */
-  $("#income-edit").addEventListener("click", () => { openDrawer(true); $("#set-income").focus(); });
+  $("#calc").addEventListener("click", e => { if (e.target.closest("#income-edit")) { openDrawer(true); $("#set-income").focus(); } });
   $("#income-form").addEventListener("submit", e => {
     e.preventDefault();
     const a = parseAmount($("#income-in").value);
