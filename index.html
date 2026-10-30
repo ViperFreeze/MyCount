@@ -103,6 +103,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .calc .cl small{display:block;font-size:12px;color:var(--muted)}
 .calc .v{font-family:var(--f-mono);font-weight:500;white-space:nowrap}
 .calc .v.in{color:var(--ok)} .calc .v.wait{color:var(--warn)}
+.gsec{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:14px 0 2px;border-top:1px solid var(--line)}
+.gsec:first-child{padding-top:0;border-top:0}
+.gsec+.cat{border-top:0;padding-top:6px}
 .calc .tot{border-top:2px solid var(--ink);font-weight:700} .calc .tot .v{font-weight:700}
 .income-form{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}
 .dgroup{display:flex;flex-direction:column;gap:2px;padding:12px 0;border-top:1px solid var(--line)}
@@ -408,7 +411,7 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
     </div>
     <div class="box">
       <h2>Catégories</h2>
-      <p class="hint">Pour ranger vos prélèvements.</p>
+      <p class="hint">Pour ranger vos prélèvements et vos dépenses.</p>
       <div class="cats" id="cats"></div>
       <form class="cat-add" id="f-cat" novalidate>
         <div class="field"><label for="c-name">Nouvelle catégorie</label><input id="c-name" maxlength="40" placeholder="Ex. Assurances"></div>
@@ -431,6 +434,7 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
       <div class="chips" id="e-quick"></div>
       <div class="field"><label for="e-note">Libellé</label><input id="e-note" maxlength="80" placeholder="Ex. Nourriture" autocomplete="off"></div>
       <div class="chips" id="e-labels" aria-label="Suggestions de libellé"></div>
+      <div class="field" id="e-cat-wrap"><span class="flabel">Catégorie (facultatif)</span><div class="chips" id="e-cats" role="group" aria-label="Catégorie de la dépense"></div></div>
       <div class="field"><label for="e-date">Date</label><input id="e-date" type="date" required></div>
       <label class="check"><input type="checkbox" id="e-cleared"><span id="e-cleared-t">Déjà débité sur mon compte</span></label>
       <div class="msg" id="e-msg" hidden></div>
@@ -438,12 +442,14 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
     </form>
     <div class="box" id="goals-box">
       <div class="pot-head"><h2>Objectifs de dépenses</h2><span class="pot-sum num" id="go-sum"></span></div>
-      <p class="hint">Un plafond par mois pour un libellé : chaque dépense saisie avec ce libellé (Essence, Nourriture…) y est comptée.</p>
+      <p class="hint">Un plafond par mois, pour une catégorie (Courses, Sorties…) ou pour un libellé (Essence, Nourriture…).</p>
       <div class="cats" id="goals"></div>
       <button type="button" class="secondary" id="go-open" aria-expanded="false">Ajouter un objectif</button>
       <form id="f-goal" class="dform" hidden novalidate>
+        <div class="kind" id="go-kind" role="group" aria-label="Type d'objectif"><button type="button" data-gk="cat" aria-pressed="true">Par catégorie</button><button type="button" data-gk="label" aria-pressed="false">Par libellé</button></div>
+        <div class="field" id="go-cat-wrap"><span class="flabel">Catégorie</span><div class="chips" id="go-cats" role="group" aria-label="Catégorie de l'objectif"></div></div>
         <div class="two">
-          <div class="field"><label for="go-name">Libellé</label><input id="go-name" maxlength="80" placeholder="Ex. Essence" autocomplete="off"></div>
+          <div class="field" id="go-name-wrap"><label for="go-name">Libellé</label><input id="go-name" maxlength="80" placeholder="Ex. Essence" autocomplete="off"></div>
           <div class="field"><label for="go-amount">Plafond par mois (€)</label><input id="go-amount" inputmode="decimal" placeholder="100" autocomplete="off"></div>
         </div>
         <div class="chips" id="go-labels" aria-label="Suggestions de libellé"></div>
@@ -512,7 +518,7 @@ const WalletCore = (() => {
     if (d.deleted && typeof d.deleted === "object") for (const [k, v] of Object.entries(d.deleted)) if (typeof v === "string") deleted[k] = v;
     const categories = (Array.isArray(d.categories) ? d.categories : [])
       .filter(c => c && typeof c.id === "string" && typeof c.name === "string" && c.name.trim() && cents(c.budget) >= 0)
-      .map(c => ({ id: c.id, name: c.name.trim().slice(0, 40), budget: cents(c.budget), order: Number(c.order) || 0, created: c.created || "", updated: c.updated || "" }));
+      .map(c => ({ id: c.id, name: c.name.trim().slice(0, 40), budget: cents(c.budget), goal: cents(c.goal) > 0 ? cents(c.goal) : 0, order: Number(c.order) || 0, created: c.created || "", updated: c.updated || "" }));
     const expenses = (Array.isArray(d.expenses) ? d.expenses : [])
       .filter(e => e && typeof e.id === "string" && okYmd(e.date) && cents(e.amount) > 0)
       // kind : "out" dépense, "in" crédit (rentrée d'argent). pending : saisie mais pas encore passée sur le compte.
@@ -640,13 +646,22 @@ const WalletCore = (() => {
     return by;
   }
 
-  return { normalize, merge, exportPayload, parseImport, monthTotals, activeDebits, potBalances, simulate, monthsToReach, goalSpent, labelKey };
+  /* Objectifs par catégorie : dépenses de la catégorie + ses prélèvements du mois (en attente compris). */
+  function catSpent(state, ym) {
+    const by = {};
+    for (const c of state.categories) by[c.id] = { exp: 0, deb: 0 };
+    for (const e of state.expenses) if (e.kind !== "in" && e.date.slice(0, 7) === ym && by[e.cat]) by[e.cat].exp += e.amount;
+    for (const d of activeDebits(state, ym)) if (by[d.cat]) by[d.cat].deb += d.amount;
+    return by;
+  }
+
+  return { normalize, merge, exportPayload, parseImport, monthTotals, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey };
 })();
 if (typeof module !== "undefined") module.exports = WalletCore;
 
 if (typeof document !== "undefined") (function () {
   "use strict";
-  const { normalize, merge, exportPayload, parseImport, monthTotals, activeDebits, potBalances, simulate, monthsToReach, goalSpent, labelKey } = WalletCore;
+  const { normalize, merge, exportPayload, parseImport, monthTotals, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey } = WalletCore;
   const LS = "mywallet-v1";
   const $ = s => document.querySelector(s);
   const pad = n => String(n).padStart(2, "0");
@@ -706,6 +721,10 @@ if (typeof document !== "undefined") (function () {
   let editGoal = "";
   let filterLabel = "";
   let kind = "out"; // type de la saisie en cours : "out" dépense, "in" crédit
+  let selExpCat = ""; // catégorie choisie pour la dépense en cours (facultative)
+  let goKind = "cat"; // objectif à ajouter : par catégorie ou par libellé
+  let selGoalCat = "";
+  let editCatGoal = "";
 
   /* ---------- Toast ---------- */
   let toastT;
@@ -901,6 +920,8 @@ if (typeof document !== "undefined") (function () {
     return [...base, ...mine];
   }
   function renderForm() {
+    if (selExpCat && !state.categories.some(c => c.id === selExpCat)) selExpCat = "";
+    $("#e-cats").innerHTML = sorted().map(c => `<button type="button" class="dchip" data-ecat="${c.id}" aria-pressed="${c.id === selExpCat}">${esc(c.name)}</button>`).join("") || `<span class="empty">Créez des catégories dans l'onglet Prélèvements.</span>`;
     const cur = $("#e-note").value.trim().toLowerCase();
     $("#e-labels").innerHTML = labelSuggestions().map(s => `<button type="button" class="dchip" data-label="${esc(s)}" aria-pressed="${s.toLowerCase() === cur}">${esc(s)}</button>`).join("");
     updateSubmit();
@@ -920,28 +941,51 @@ if (typeof document !== "undefined") (function () {
   }
   function renderGoals(tm) {
     tm = tm || timing(view);
-    const sp = goalSpent(state, view), gs = goalsSorted();
-    const totLim = gs.reduce((s, g) => s + g.amount, 0), totSp = gs.reduce((s, g) => s + sp[g.id], 0);
-    $("#go-sum").innerHTML = gs.length ? `${eur(totSp)}<small>sur ${eur(totLim)}</small>` : "";
-    $("#goals").innerHTML = gs.map(g => {
-      const v = sp[g.id], r = g.amount - v, lv = level(v, g.amount, tm.frac);
-      const tick = tm.kind === "current" ? `<i style="left:${(tm.frac * 100).toFixed(1)}%"></i>` : "";
+    const sp = goalSpent(state, view), gs = goalsSorted(), cs = catSpent(state, view), cgs = sorted().filter(c => c.goal);
+    const tick = tm.kind === "current" ? `<i style="left:${(tm.frac * 100).toFixed(1)}%"></i>` : "";
+    // Une ligne d'objectif : barre, reste ou dépassement, actions.
+    const gRow = (name, v, lim, foot, see, edit) => {
+      const r = lim - v, lv = level(v, lim, tm.frac);
       const left = r >= 0 ? `<small>reste</small>${eur(r)}` : `<small>dépassé de</small>${eur(-r)}`;
-      const row = `<div class="cat">
-        <div class="cat-top"><span class="cat-name">${esc(g.name)}</span><span class="cat-left num${lv === "ok" ? "" : " " + lv}">${left}</span></div>
-        <div class="bar" role="img" aria-label="${esc(g.name)} : ${eur(v)} dépensés sur ${eur(g.amount)}"><span class="${lv === "ok" ? "" : lv}" style="width:${Math.min(100, v / g.amount * 100)}%"></span>${tick}</div>
-        <div class="cat-foot"><span class="m">${eur(v)} / ${eur(g.amount)}</span><span class="cat-acts"><button type="button" class="sbtn" data-gsee="${g.id}">Voir</button><button type="button" class="sbtn" data-gedit="${g.id}">Modifier</button></span></div>
+      return `<div class="cat">
+        <div class="cat-top"><span class="cat-name">${esc(name)}</span><span class="cat-left num${lv === "ok" ? "" : " " + lv}">${left}</span></div>
+        <div class="bar" role="img" aria-label="${esc(name)} : ${eur(v)} dépensés sur ${eur(lim)}"><span class="${lv === "ok" ? "" : lv}" style="width:${Math.min(100, v / lim * 100)}%"></span>${tick}</div>
+        <div class="cat-foot"><span class="m">${eur(v)} / ${eur(lim)}${foot}</span><span class="cat-acts"><button type="button" class="sbtn" ${see}>Voir</button><button type="button" class="sbtn" ${edit}>Modifier</button></span></div>
       </div>`;
+    };
+    const catRows = cgs.map(c => {
+      const x = cs[c.id], v = x.exp + x.deb;
+      const row = gRow(c.name, v, c.goal, x.deb ? ` · dont ${eur(x.deb)} de prélèvements` : "", `data-cgsee="${c.id}"`, `data-cgedit="${c.id}"`);
+      if (editCatGoal !== c.id) return row;
+      return row + `<form class="cat-edit goal-edit" data-cgform="${c.id}">
+        <div class="field"><label for="cge-a-${c.id}">${esc(c.name)} par mois (€)</label><input id="cge-a-${c.id}" inputmode="decimal" value="${String(c.goal / 100).replace(".", ",")}"></div>
+        <div class="row"><button type="button" class="sbtn del" data-cgdel="${c.id}">Retirer l'objectif</button><span class="row"><button type="button" class="sbtn" data-cgcancel>Annuler</button><button class="sbtn" type="submit" style="font-weight:600">Enregistrer</button></span></div>
+      </form>`;
+    }).join("");
+    const labelRows = gs.map(g => {
+      const row = gRow(g.name, sp[g.id], g.amount, "", `data-gsee="${g.id}"`, `data-gedit="${g.id}"`);
       if (editGoal !== g.id) return row;
       return row + `<form class="cat-edit goal-edit" data-gform="${g.id}">
         <div class="field"><label for="ge-n-${g.id}">Libellé</label><input id="ge-n-${g.id}" value="${esc(g.name)}" maxlength="80"></div>
         <div class="field"><label for="ge-a-${g.id}">Par mois (€)</label><input id="ge-a-${g.id}" inputmode="decimal" value="${String(g.amount / 100).replace(".", ",")}"></div>
         <div class="row"><button type="button" class="sbtn del" data-gdel="${g.id}">Supprimer</button><span class="row"><button type="button" class="sbtn" data-gcancel>Annuler</button><button class="sbtn" type="submit" style="font-weight:600">Enregistrer</button></span></div>
       </form>`;
-    }).join("") || `<p class="empty">Aucun objectif. Fixez par exemple 100 € par mois pour l'essence.</p>`;
+    }).join("");
+    // En-tête : total des objectifs par catégorie (les libellés peuvent se recouper avec, on ne les additionne pas aux catégories).
+    const head = cgs.length ? [cgs.reduce((t, c) => t + cs[c.id].exp + cs[c.id].deb, 0), cgs.reduce((t, c) => t + c.goal, 0)] : gs.length ? [gs.reduce((t, g) => t + sp[g.id], 0), gs.reduce((t, g) => t + g.amount, 0)] : null;
+    $("#go-sum").innerHTML = head ? `${eur(head[0])}<small>sur ${eur(head[1])}</small>` : "";
+    const both = cgs.length && gs.length;
+    $("#goals").innerHTML = (both ? `<div class="gsec">Par catégorie</div>` : "") + catRows + (both ? `<div class="gsec">Par libellé</div>` : "") + labelRows
+      || `<p class="empty">Aucun objectif. Fixez par exemple 250 € par mois pour la catégorie Courses, ou 100 € pour l'Essence.</p>`;
+    // Formulaire d'ajout
+    document.querySelectorAll("#go-kind button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.gk === goKind)));
+    $("#go-cat-wrap").hidden = goKind !== "cat"; $("#go-name-wrap").hidden = goKind !== "label";
+    const free = sorted().filter(c => !c.goal);
+    if (!free.some(c => c.id === selGoalCat)) selGoalCat = free[0] ? free[0].id : "";
+    $("#go-cats").innerHTML = free.map(c => `<button type="button" class="dchip" data-gocat="${c.id}" aria-pressed="${c.id === selGoalCat}">${esc(c.name)}</button>`).join("") || `<span class="empty">${state.categories.length ? "Toutes vos catégories ont déjà un objectif." : "Créez des catégories dans l'onglet Prélèvements."}</span>`;
     const taken = new Set(gs.map(g => labelKey(g.name)));
     const cur = labelKey($("#go-name").value);
-    $("#go-labels").innerHTML = labelSuggestions().filter(n => !taken.has(labelKey(n))).map(n => `<button type="button" class="dchip" data-glabel="${esc(n)}" aria-pressed="${labelKey(n) === cur}">${esc(n)}</button>`).join("");
+    $("#go-labels").innerHTML = goKind !== "label" ? "" : labelSuggestions().filter(n => !taken.has(labelKey(n))).map(n => `<button type="button" class="dchip" data-glabel="${esc(n)}" aria-pressed="${labelKey(n) === cur}">${esc(n)}</button>`).join("");
   }
 
   function renderList() {
@@ -1041,7 +1085,7 @@ if (typeof document !== "undefined") (function () {
 
   /* ---------- Mois ---------- */
   function setMonth(ym) {
-    view = ym; editing = ""; editGoal = "";
+    view = ym; editing = ""; editGoal = ""; editCatGoal = "";
     const cur = todayYm();
     $("#e-date").value = ym === cur ? ymd(new Date()) : ym < cur ? `${ym}-${pad(daysIn(ym))}` : `${ym}-01`;
     render();
@@ -1086,20 +1130,28 @@ if (typeof document !== "undefined") (function () {
   /* ---------- Dépenses ---------- */
   $("#e-quick").innerHTML = [5, 10, 20, 50].map(v => `<button type="button" class="dchip" data-v="${v * 100}">${v} €</button>`).join("");
   $("#e-quick").addEventListener("click", e => { const b = e.target.closest("[data-v]"); if (!b) return; $("#e-amount").value = String(Number(b.dataset.v) / 100); updateSubmit(); });
-  $("#e-labels").addEventListener("click", e => { const b = e.target.closest("[data-label]"); if (!b) return; $("#e-note").value = b.dataset.label; updateSubmit(); if (!parseAmount($("#e-amount").value)) $("#e-amount").focus(); });
+  $("#e-labels").addEventListener("click", e => { const b = e.target.closest("[data-label]"); if (!b) return; $("#e-note").value = b.dataset.label; guessCat(); updateSubmit(); if (!parseAmount($("#e-amount").value)) $("#e-amount").focus(); });
   $("#e-note").addEventListener("input", updateSubmit);
   $("#e-amount").addEventListener("input", updateSubmit);
   /* Dépense ou crédit (rentrée d'argent ponctuelle : remboursement, virement reçu…). */
   function setKind(k) {
     kind = k;
-    document.querySelectorAll(".kind button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.kind === k)));
+    document.querySelectorAll("#f-exp .kind button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.kind === k)));
     $("#e-title").textContent = k === "in" ? "Nouveau crédit" : "Nouvelle dépense";
     $("#e-note").placeholder = k === "in" ? "Ex. Remboursement" : "Ex. Nourriture";
     $("#e-cleared-t").textContent = k === "in" ? "Déjà reçu sur mon compte" : "Déjà débité sur mon compte";
-    $("#e-quick").hidden = $("#e-labels").hidden = k === "in";
+    $("#e-quick").hidden = $("#e-labels").hidden = $("#e-cat-wrap").hidden = k === "in";
     updateSubmit();
   }
-  document.querySelector(".kind").addEventListener("click", e => { const b = e.target.closest("[data-kind]"); if (b) setKind(b.dataset.kind); });
+  /* Catégorie de la dépense : reprise automatiquement de la dernière dépense avec le même libellé. */
+  function guessCat() {
+    const k = labelKey($("#e-note").value); if (!k) return;
+    const last = state.expenses.filter(e => e.kind !== "in" && e.cat && labelKey(e.note) === k && state.categories.some(c => c.id === e.cat)).sort((a, b) => (b.created || "").localeCompare(a.created || ""))[0];
+    if (last) { selExpCat = last.cat; renderForm(); }
+  }
+  $("#e-note").addEventListener("change", guessCat);
+  $("#e-cats").addEventListener("click", e => { const b = e.target.closest("[data-ecat]"); if (!b) return; selExpCat = selExpCat === b.dataset.ecat ? "" : b.dataset.ecat; renderForm(); });
+  document.querySelector("#f-exp .kind").addEventListener("click", e => { const b = e.target.closest("[data-kind]"); if (b) setKind(b.dataset.kind); });
   $("#f-exp").addEventListener("submit", e => {
     e.preventDefault();
     const amount = parseAmount($("#e-amount").value), date = $("#e-date").value, m = $("#e-msg");
@@ -1111,7 +1163,9 @@ if (typeof document !== "undefined") (function () {
     const t = nowIso();
     // Par défaut l'opération est « en attente » : elle sera validée quand elle passera vraiment sur le compte.
     const pending = !$("#e-cleared").checked, cin = kind === "in";
-    state.expenses.push({ id: "e" + uid(), date, amount, kind, pending, cat: "", note, created: t, updated: t });
+    const cat = cin ? "" : selExpCat;
+    state.expenses.push({ id: "e" + uid(), date, amount, kind, pending, cat, note, created: t, updated: t });
+    selExpCat = "";
     save();
     const ym = date.slice(0, 7);
     if (ym !== view) view = ym;
@@ -1120,6 +1174,8 @@ if (typeof document !== "undefined") (function () {
     const T = monthTotals(state, ym), r = T.income + T.credits - T.total;
     const wait = pending ? (cin ? " · à recevoir" : " · en attente de débit") : "";
     if (cin) { toast(`${note} : +${eur(amount)}${wait} · il vous reste ${r < 0 ? "−" : ""}${eur(Math.abs(r))}`); setKind("out"); return; }
+    const cg = state.categories.find(c => c.id === cat && c.goal), cgS = cg ? (x => x.exp + x.deb)(catSpent(state, ym)[cg.id]) : 0;
+    if (!state.goals.some(g => labelKey(g.name) === labelKey(note)) && cg) { toast(`${note} : ${eur(amount)}${wait} · ${goalStatus({ name: cg.name, amount: cg.goal }, cgS)}`); return; }
     if (pending) { const goal = state.goals.find(g => labelKey(g.name) === labelKey(note)); toast(goal ? `${note} : ${eur(amount)}${wait} · ${goalStatus(goal, goalSpent(state, ym)[goal.id])}` : `${note} : ${eur(amount)}${wait} · il vous reste ${r < 0 ? "−" : ""}${eur(Math.abs(r))}`); return; }
     const goal = state.goals.find(g => labelKey(g.name) === labelKey(note));
     if (goal) { toast(`${note} : ${eur(amount)} · ${goalStatus(goal, goalSpent(state, ym)[goal.id])}`); return; }
@@ -1164,6 +1220,17 @@ if (typeof document !== "undefined") (function () {
   $("#f-goal").addEventListener("submit", e => {
     e.preventDefault();
     const name = $("#go-name").value.trim(), amount = parseAmount($("#go-amount").value), m = $("#go-msg");
+    const closeForm = () => { $("#f-goal").hidden = true; $("#go-open").textContent = "Ajouter un objectif"; $("#go-open").setAttribute("aria-expanded", "false"); };
+    if (goKind === "cat") {
+      const c = state.categories.find(x => x.id === selGoalCat);
+      if (!c) { m.hidden = false; m.textContent = state.categories.length ? "Choisissez une catégorie." : "Créez d'abord une catégorie dans l'onglet Prélèvements."; return; }
+      if (!amount) { m.hidden = false; m.textContent = "Indiquez le plafond par mois en euros, par exemple 250."; $("#go-amount").focus(); return; }
+      m.hidden = true;
+      c.goal = amount; c.updated = nowIso(); $("#go-amount").value = ""; closeForm(); save(); render();
+      const x = catSpent(state, view)[c.id];
+      toast(`Objectif ${c.name} : ${eur(amount)} par mois · ${goalStatus({ name: c.name, amount }, x.exp + x.deb)}`);
+      return;
+    }
     if (!name) { m.hidden = false; m.textContent = "Indiquez un libellé, par exemple Essence."; $("#go-name").focus(); return; }
     if (!amount) { m.hidden = false; m.textContent = "Indiquez le plafond par mois en euros, par exemple 100."; $("#go-amount").focus(); return; }
     if (state.goals.some(g => labelKey(g.name) === labelKey(name))) { m.hidden = false; m.textContent = `Il y a déjà un objectif pour « ${name} ».`; return; }
@@ -1175,10 +1242,21 @@ if (typeof document !== "undefined") (function () {
     save(); render();
     toast(`Objectif « ${name} » : ${eur(amount)} par mois`);
   });
+  $("#go-kind").addEventListener("click", e => { const b = e.target.closest("[data-gk]"); if (!b) return; goKind = b.dataset.gk; $("#go-msg").hidden = true; renderGoals(); (goKind === "label" ? $("#go-name") : $("#go-amount")).focus(); });
+  $("#go-cats").addEventListener("click", e => { const b = e.target.closest("[data-gocat]"); if (!b) return; selGoalCat = b.dataset.gocat; renderGoals(); $("#go-amount").focus(); });
   $("#goals").addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.cgsee) { filterLabel = ""; filterCat = b.dataset.cgsee; renderList(); $("#l-title").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    if (b.dataset.cgedit) { editCatGoal = editCatGoal === b.dataset.cgedit ? "" : b.dataset.cgedit; editGoal = ""; renderGoals(); const i = $(`#cge-a-${editCatGoal}`); if (i) i.focus(); return; }
+    if (b.dataset.cgcancel !== undefined) { editCatGoal = ""; renderGoals(); return; }
+    if (b.dataset.cgdel) {
+      const c = state.categories.find(x => x.id === b.dataset.cgdel), before = c.goal;
+      c.goal = 0; c.updated = nowIso(); editCatGoal = ""; save(); render();
+      toast(`Objectif ${c.name} retiré`, "Annuler", () => { c.goal = before; c.updated = nowIso(); save(); render(); });
+      return;
+    }
     if (b.dataset.gsee) { const g = state.goals.find(x => x.id === b.dataset.gsee); filterCat = ""; filterLabel = labelKey(g.name); renderList(); $("#l-title").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
-    if (b.dataset.gedit) { editGoal = editGoal === b.dataset.gedit ? "" : b.dataset.gedit; renderGoals(); const i = $(`#ge-a-${editGoal}`); if (i) i.focus(); return; }
+    if (b.dataset.gedit) { editGoal = editGoal === b.dataset.gedit ? "" : b.dataset.gedit; editCatGoal = ""; renderGoals(); const i = $(`#ge-a-${editGoal}`); if (i) i.focus(); return; }
     if (b.dataset.gcancel !== undefined) { editGoal = ""; renderGoals(); return; }
     if (b.dataset.gdel) {
       if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer"; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = "Supprimer"; } }, 3000); return; }
@@ -1189,6 +1267,14 @@ if (typeof document !== "undefined") (function () {
   });
   $("#goals").addEventListener("submit", e => {
     e.preventDefault();
+    const cf = e.target.closest("form[data-cgform]");
+    if (cf) {
+      const c = state.categories.find(x => x.id === cf.dataset.cgform), amount = parseAmount($(`#cge-a-${c.id}`).value);
+      if (!amount) { toast("Indiquez un plafond en euros, par exemple 250."); return; }
+      c.goal = amount; c.updated = nowIso(); editCatGoal = ""; save(); render();
+      toast(`Objectif ${c.name} : ${eur(amount)} par mois`);
+      return;
+    }
     const f = e.target.closest("form[data-gform]"); if (!f) return;
     const g = state.goals.find(x => x.id === f.dataset.gform);
     const name = $(`#ge-n-${g.id}`).value.trim(), amount = parseAmount($(`#ge-a-${g.id}`).value);
