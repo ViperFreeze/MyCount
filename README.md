@@ -4,7 +4,9 @@ Application web de suivi de budget personnel, en un seul fichier HTML, sans serv
 
 ## Fonctionnalités
 
-- **Mois** (accueil) : en gros, ce qui reste ce mois-ci (revenus − prélèvements − dépenses), puis la saisie des dépenses avec un libellé (suggestions : Nourriture, Essence et vos libellés habituels) et leur historique.
+- **Mois** (accueil) : en gros, ce qui reste ce mois-ci (revenus + crédits − prélèvements − dépenses), avec le détail déjà débité / à débiter / crédits, puis la saisie des dépenses avec un libellé (suggestions : Nourriture, Essence et vos libellés habituels) et leur historique.
+- **Double validation** : une dépense saisie est d'abord « en attente ». Elle est comptée tout de suite dans ce qui reste, mais ne passe en « déjà débité » que quand vous touchez « Débité », une fois l'opération vraiment visible sur votre compte en banque. Le cadre « À valider » liste tout ce qui n'est pas encore passé, y compris les prélèvements du mois. Une case « Déjà débité » permet de saisir une opération déjà passée.
+- **Crédits** : les rentrées d'argent ponctuelles (remboursement, virement reçu…) s'ajoutent aux revenus du mois, avec la même validation « Reçu ».
 - **Objectifs de dépenses** (onglet Mois) : un plafond mensuel par libellé, par exemple 100 € pour l'Essence ou 250 € pour la Nourriture. Chaque dépense saisie avec ce libellé y est comptée ; une barre montre ce qui reste ou le dépassement, et « Voir » filtre la liste.
 - **Prélèvements** : les prélèvements mensuels rangés par catégorie, et la gestion des catégories.
 - **Stats** : comparaison des dépenses sur les 6 derniers mois.

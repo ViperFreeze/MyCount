@@ -99,7 +99,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .dgroup{display:flex;flex-direction:column;gap:2px;padding:12px 0;border-top:1px solid var(--line)}
 .dgroup:first-child{border-top:0;padding-top:2px}
 .dgroup .cat-top{margin-bottom:4px}
-.drow{display:grid;grid-template-columns:40px 1fr auto auto;gap:10px;align-items:center;padding:5px 0;font-size:14px}
+.drow{display:grid;grid-template-columns:40px 1fr auto auto auto;gap:10px;align-items:center;padding:5px 0;font-size:14px}
 .dday{font-family:var(--f-mono);font-size:11px;color:var(--muted);text-transform:uppercase}
 .dname{overflow-wrap:anywhere;min-width:0}
 .dform{display:flex;flex-direction:column;gap:12px}
@@ -210,6 +210,17 @@ textarea{width:100%;min-height:84px;padding:10px 11px;border:1px solid var(--lin
 .right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .amt{font-family:var(--f-mono);font-weight:500;font-size:14px;white-space:nowrap}
 .empty{color:var(--muted);font-size:14px;margin:0}
+/* Opérations en attente de débit / crédits */
+.amt.in{color:var(--ok)}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:0 7px;border-radius:999px;background:var(--warn-soft);color:var(--warn)}
+.okbtn{border:1px solid var(--ok);background:var(--ok-soft);color:var(--ok);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+#pend-box{border-color:var(--warn)}
+.pend-sum{color:var(--warn)}
+.drow .st{font-size:11px;font-weight:600;color:var(--muted)} .drow .st.ok{color:var(--ok)}
+.kind{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--sunk);border-radius:999px;padding:4px}
+.kind button{border:0;background:transparent;border-radius:999px;padding:7px;font:inherit;font-weight:600;font-size:14px;color:var(--muted);cursor:pointer}
+.kind button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)} .check input{width:18px;height:18px;accent-color:var(--accent)}
 .filter{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;background:var(--accent-soft);border-radius:8px;padding:6px 6px 6px 12px}
 
 /* Stats */
@@ -360,9 +371,9 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
     <div class="gauge" aria-hidden="true"><div class="fd" id="g-debit"></div><div class="f" id="g-fill"></div></div>
     <div class="scale"><span id="sc-a"></span><span id="sc-b"></span></div>
     <div class="figs">
-      <div class="fig"><span class="label">Prélèvements</span><b class="num" id="k-debits">0 €</b></div>
-      <div class="fig"><span class="label">Dépenses</span><b class="num" id="k-spent">0 €</b></div>
-      <div class="fig"><span class="label" id="k-day-l">Après prélèv.</span><b class="num" id="k-day">–</b></div>
+      <div class="fig"><span class="label">Déjà débité</span><b class="num" id="k-done">0 €</b></div>
+      <div class="fig"><span class="label">À débiter</span><b class="num" id="k-pend">0 €</b></div>
+      <div class="fig"><span class="label">Crédits</span><b class="num" id="k-in">0 €</b></div>
     </div>
   </section>
 
@@ -403,13 +414,20 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
   </section>
 
   <section class="panel" id="p-log" role="tabpanel" aria-labelledby="t-log">
+    <div class="box" id="pend-box" hidden>
+      <div class="pot-head"><h2>À valider</h2><span class="pot-sum num pend-sum" id="pend-sum"></span></div>
+      <p class="hint">Touchez « Débité » quand l'opération apparaît vraiment sur votre compte en banque.</p>
+      <div class="list" id="pend"></div>
+    </div>
     <form class="box" id="f-exp" novalidate>
-      <h2>Nouvelle dépense</h2>
+      <h2 id="e-title">Nouvelle dépense</h2>
+      <div class="kind" role="group" aria-label="Type d'opération"><button type="button" data-kind="out" aria-pressed="true">Dépense</button><button type="button" data-kind="in" aria-pressed="false">Crédit</button></div>
       <div class="field amount"><label for="e-amount">Montant</label><input id="e-amount" inputmode="decimal" autocomplete="off" placeholder="0,00"><span>€</span></div>
       <div class="chips" id="e-quick"></div>
       <div class="field"><label for="e-note">Libellé</label><input id="e-note" maxlength="80" placeholder="Ex. Nourriture" autocomplete="off"></div>
       <div class="chips" id="e-labels" aria-label="Suggestions de libellé"></div>
       <div class="field"><label for="e-date">Date</label><input id="e-date" type="date" required></div>
+      <label class="check"><input type="checkbox" id="e-cleared"><span id="e-cleared-t">Déjà débité sur mon compte</span></label>
       <div class="msg" id="e-msg" hidden></div>
       <button class="primary" type="submit" id="e-submit">Ajouter</button>
     </form>
@@ -492,7 +510,9 @@ const WalletCore = (() => {
       .map(c => ({ id: c.id, name: c.name.trim().slice(0, 40), budget: cents(c.budget), order: Number(c.order) || 0, created: c.created || "", updated: c.updated || "" }));
     const expenses = (Array.isArray(d.expenses) ? d.expenses : [])
       .filter(e => e && typeof e.id === "string" && okYmd(e.date) && cents(e.amount) > 0)
-      .map(e => ({ id: e.id, date: e.date, amount: cents(e.amount), cat: typeof e.cat === "string" ? e.cat : "", note: typeof e.note === "string" ? e.note.slice(0, 80) : "", created: e.created || "", updated: e.updated || "" }));
+      // kind : "out" dépense, "in" crédit (rentrée d'argent). pending : saisie mais pas encore passée sur le compte.
+      // Les anciennes saisies (sans ces champs) sont des dépenses considérées comme débitées.
+      .map(e => ({ id: e.id, date: e.date, amount: cents(e.amount), kind: e.kind === "in" ? "in" : "out", pending: e.pending === true, cat: typeof e.cat === "string" ? e.cat : "", note: typeof e.note === "string" ? e.note.slice(0, 80) : "", created: e.created || "", updated: e.updated || "" }));
     const pots = (Array.isArray(d.pots) ? d.pots : [])
       .filter(p => p && typeof p.id === "string" && typeof p.name === "string" && p.name.trim() && cents(p.target) > 0)
       .map(p => ({ id: p.id, name: p.name.trim().slice(0, 40), target: cents(p.target), deadline: typeof p.deadline === "string" && /^\d{4}-\d{2}$/.test(p.deadline) ? p.deadline : "", created: p.created || "", updated: p.updated || "" }));
@@ -504,7 +524,12 @@ const WalletCore = (() => {
     const okYm = s => typeof s === "string" && /^\d{4}-\d{2}$/.test(s);
     const debits = (Array.isArray(d.debits) ? d.debits : [])
       .filter(x => x && typeof x.id === "string" && typeof x.name === "string" && x.name.trim() && cents(x.amount) > 0 && okYm(x.since))
-      .map(x => ({ id: x.id, name: x.name.trim().slice(0, 40), amount: cents(x.amount), cat: typeof x.cat === "string" ? x.cat : "", day: Number.isInteger(x.day) && x.day >= 1 && x.day <= 31 ? x.day : 0, since: x.since, until: okYm(x.until) ? x.until : "", created: x.created || "", updated: x.updated || "" }));
+      .map(x => {
+        // done : mois (AAAA-MM) où le prélèvement a été validé comme vraiment débité.
+        const done = {};
+        if (x.done && typeof x.done === "object") for (const [k, v] of Object.entries(x.done)) if (okYm(k) && typeof v === "string") done[k] = v;
+        return { id: x.id, name: x.name.trim().slice(0, 40), amount: cents(x.amount), cat: typeof x.cat === "string" ? x.cat : "", day: Number.isInteger(x.day) && x.day >= 1 && x.day <= 31 ? x.day : 0, since: x.since, until: okYm(x.until) ? x.until : "", done, created: x.created || "", updated: x.updated || "" };
+      });
     // Objectifs de dépenses : un plafond mensuel par libellé (ex. Essence 100 €).
     const goals = (Array.isArray(d.goals) ? d.goals : [])
       .filter(g => g && typeof g.id === "string" && typeof g.name === "string" && g.name.trim() && cents(g.amount) > 0)
@@ -581,16 +606,21 @@ const WalletCore = (() => {
 
   /* Totaux d'un mois : prélèvements + dépenses, par catégorie, et ce qu'il reste sur les revenus. */
   function monthTotals(state, ym) {
-    const by = {}; let spent = 0, debits = 0, orphan = 0, count = 0;
+    const by = {}; let spent = 0, debits = 0, orphan = 0, count = 0, credits = 0, pendOut = 0, pendIn = 0;
     const known = new Set(state.categories.map(c => c.id));
     const put = (cat, v) => { if (known.has(cat)) by[cat] = (by[cat] || 0) + v; else orphan += v; };
     for (const e of state.expenses) {
       if (e.date.slice(0, 7) !== ym) continue;
+      if (e.kind === "in") { credits += e.amount; if (e.pending) pendIn += e.amount; continue; }
       spent += e.amount; count++; put(e.cat, e.amount);
+      if (e.pending) pendOut += e.amount;
     }
-    for (const d of activeDebits(state, ym)) { debits += d.amount; put(d.cat, d.amount); }
+    // Un prélèvement d'un mois terminé est forcément passé : seuls ceux du mois en cours (ou à venir) restent à valider.
+    const now = new Date(), curYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    for (const d of activeDebits(state, ym)) { debits += d.amount; put(d.cat, d.amount); if (!d.done[ym] && ym >= curYm) pendOut += d.amount; }
     const budget = state.categories.reduce((s, c) => s + c.budget, 0);
-    return { by, total: spent + debits, spent, debits, orphan, budget, count, income: state.income.amount };
+    // total : tout ce qui sort (prélèvements + dépenses), en attente compris. done : ce qui est déjà passé sur le compte.
+    return { by, total: spent + debits, spent, debits, orphan, budget, count, income: state.income.amount, credits, pendOut, pendIn, done: spent + debits - pendOut };
   }
 
   /* Objectifs de dépenses : ce qui est dépensé dans le mois sous chaque libellé (sans tenir compte des majuscules). */
@@ -599,7 +629,7 @@ const WalletCore = (() => {
     const by = {}, idx = {};
     for (const g of state.goals) { idx[labelKey(g.name)] = g.id; by[g.id] = 0; }
     for (const e of state.expenses) {
-      if (e.date.slice(0, 7) !== ym) continue;
+      if (e.date.slice(0, 7) !== ym || e.kind === "in") continue;
       const id = idx[labelKey(e.note)]; if (id) by[id] += e.amount;
     }
     return by;
@@ -670,6 +700,7 @@ if (typeof document !== "undefined") (function () {
   let selDebitCat = "";
   let editGoal = "";
   let filterLabel = "";
+  let kind = "out"; // type de la saisie en cours : "out" dépense, "in" crédit
 
   /* ---------- Toast ---------- */
   let toastT;
@@ -702,40 +733,42 @@ if (typeof document !== "undefined") (function () {
 
   function render() {
     const T = monthTotals(state, view), tm = timing(view);
-    const left = T.income - T.total;
+    // Budget réel : revenus + crédits − tout ce qui sort (y compris ce qui n'est pas encore débité).
+    const inTot = T.income + T.credits;
+    const left = inTot - T.total;
     const mon = monthName(view).split(" ")[0];
     $("#h-month").textContent = monthName(view);
     $("#m-next").disabled = view >= ymShift(todayYm(), 1);
     $("#h-sub").textContent = tm.kind === "current" ? `Jour ${tm.elapsed} sur ${tm.dim} · ${T.count} dépense${T.count > 1 ? "s" : ""}` : tm.kind === "past" ? `Mois terminé · ${T.count} dépense${T.count > 1 ? "s" : ""}` : "Mois à venir";
 
     // Ce qui reste = revenus − prélèvements − dépenses
-    const has = T.income > 0, fl = $("#f-left"), st = $("#f-status");
+    const has = inTot > 0, fl = $("#f-left"), st = $("#f-status");
     $(".left-label").textContent = tm.kind === "past" ? `Il vous est resté en ${mon}` : tm.kind === "future" ? `Il vous restera en ${mon}, avant dépenses` : "Il vous reste ce mois-ci";
     fl.textContent = has ? (left < 0 ? "−" : "") + eurR(Math.abs(left)) : "–";
     fl.classList.toggle("neg", has && left < 0);
-    const proj = tm.kind === "current" && T.spent > 0 ? T.income - T.debits - Math.round(T.spent / tm.elapsed * tm.dim) : left;
+    const proj = tm.kind === "current" && T.spent > 0 ? inTot - T.debits - Math.round(T.spent / tm.elapsed * tm.dim) : left;
     const lv = !has ? "" : left < 0 ? "bad" : proj < 0 ? "warn" : "ok";
     st.hidden = !has; st.className = "chip " + lv;
     st.textContent = lv === "bad" ? "Dans le rouge" : lv === "warn" ? "Rythme trop élevé" : tm.kind === "future" ? "Prévision" : "Ça va";
-    $("#income-t").innerHTML = has ? `Revenus du mois : <b>${eur(T.income)}</b>` : "Indiquez vos revenus pour savoir ce qui vous reste.";
-    $("#income-edit").textContent = has ? "Modifier" : "Indiquer";
-    $("#income-form").hidden = has;
-    $("#income-edit").hidden = !has;
+    const hasInc = T.income > 0;
+    $("#income-t").innerHTML = hasInc ? `Revenus du mois : <b>${eur(T.income)}</b>${T.credits ? ` + crédits <b>${eur(T.credits)}</b>` : ""}` : "Indiquez vos revenus pour savoir ce qui vous reste.";
+    $("#income-edit").textContent = hasInc ? "Modifier" : "Indiquer";
+    $("#income-form").hidden = hasInc;
+    $("#income-edit").hidden = !hasInc;
 
-    const base = Math.max(T.income, T.total, 1);
+    const base = Math.max(inTot, T.total, 1);
     const wd = T.debits / base * 100, we = T.spent / base * 100;
     $("#g-debit").style.width = Math.min(100, wd) + "%";
     const gf = $("#g-fill"); gf.style.left = Math.min(100, wd) + "%"; gf.style.width = Math.max(0, Math.min(100 - wd, we)) + "%";
     gf.className = "f" + (lv === "bad" ? " bad" : lv === "warn" ? " warn" : "");
-    $("#sc-a").textContent = has ? `${nf0.format(Math.round(T.total / T.income * 100))} % des revenus utilisés` : `${eurR(T.total)} sortis`;
-    $("#sc-b").textContent = has ? eurR(T.income) : "";
-    $("#k-debits").textContent = eurR(T.debits);
-    $("#k-spent").textContent = eurR(T.spent);
-    // Revenus − prélèvements : ce qu'il reste pour les dépenses du mois
-    const afterDebits = T.income - T.debits;
-    $("#k-day").textContent = has ? (afterDebits < 0 ? "−" : "") + eurR(Math.abs(afterDebits)) : "–";
+    $("#sc-a").textContent = has ? `${nf0.format(Math.round(T.total / inTot * 100))} % des revenus utilisés` : `${eurR(T.total)} sortis`;
+    $("#sc-b").textContent = has ? eurR(inTot) : "";
+    $("#k-done").textContent = eurR(T.done);
+    $("#k-pend").textContent = eurR(T.pendOut);
+    $("#k-in").textContent = (T.credits ? "+" : "") + eurR(T.credits);
 
     renderDebits();
+    renderPending();
     renderCats(T, tm);
     renderForm();
     renderGoals(tm);
@@ -816,18 +849,22 @@ if (typeof document !== "undefined") (function () {
     }).join("") || `<p class="empty">Aucune catégorie. Ajoutez-en une ci-dessous.</p>`;
   }
 
+  /* Statut d'un prélèvement pour le mois affiché : à valider quand il passe vraiment sur le compte. */
+  const debitSt = d => view > todayYm() ? `<span class="st">prévu</span>` : view < todayYm() ? `<span class="st ok">✓ passé</span>`
+    : d.done[view] ? `<button type="button" class="sbtn" data-dundo="${d.id}" title="Annuler la validation">✓ débité</button>`
+    : `<button type="button" class="okbtn" data-dok="${d.id}">Débité</button>`;
   function renderDebits() {
     const list = activeDebits(state, view), cats = sorted();
     const total = list.reduce((s, d) => s + d.amount, 0);
     $("#d-sum").innerHTML = `${eur(total)}<small>par mois</small>`;
     const sd = list.find(d => d.id === SAVE_ID);
-    const saveGroup = sd ? `<div class="dgroup"><div class="cat-top"><span class="cat-name">Épargne</span><span class="amt num">${eur(sd.amount)}</span></div><div class="drow"><span class="dday">${sd.day ? "le " + sd.day : ""}</span><span class="dname">Vers mon épargne</span><span class="amt num">${eur(sd.amount)}</span><button type="button" class="sbtn" data-gosave>Modifier</button></div></div>` : "";
+    const saveGroup = sd ? `<div class="dgroup"><div class="cat-top"><span class="cat-name">Épargne</span><span class="amt num">${eur(sd.amount)}</span></div><div class="drow"><span class="dday">${sd.day ? "le " + sd.day : ""}</span><span class="dname">Vers mon épargne</span><span class="amt num">${eur(sd.amount)}</span>${debitSt(sd)}<button type="button" class="sbtn" data-gosave>Modifier</button></div></div>` : "";
     const groups = saveGroup + cats.map(c => [c.id, c.name]).concat([["", "Hors catégorie"]]).map(([id, name]) => {
       const ds = list.filter(d => d.id !== SAVE_ID && (id ? d.cat === id : !cats.some(c => c.id === d.cat))).sort((a, b) => (a.day || 99) - (b.day || 99) || a.name.localeCompare(b.name, "fr"));
       if (!ds.length) return "";
       const sum = ds.reduce((s, d) => s + d.amount, 0);
       return `<div class="dgroup"><div class="cat-top"><span class="cat-name">${esc(name)}</span><span class="amt num">${eur(sum)}</span></div>` + ds.map(d => {
-        const row = `<div class="drow"><span class="dday">${d.day ? "le " + d.day : ""}</span><span class="dname">${esc(d.name)}</span><span class="amt num">${eur(d.amount)}</span><button type="button" class="sbtn" data-dedit="${d.id}">Modifier</button></div>`;
+        const row = `<div class="drow"><span class="dday">${d.day ? "le " + d.day : ""}</span><span class="dname">${esc(d.name)}</span><span class="amt num">${eur(d.amount)}</span>${debitSt(d)}<button type="button" class="sbtn" data-dedit="${d.id}">Modifier</button></div>`;
         if (editDebit !== d.id) return row;
         return row + `<form class="dedit" data-dform="${d.id}">
           <div class="field"><label for="de-n-${d.id}">Nom</label><input id="de-n-${d.id}" value="${esc(d.name)}" maxlength="40"></div>
@@ -847,7 +884,7 @@ if (typeof document !== "undefined") (function () {
   function labelSuggestions() {
     const base = ["Nourriture", "Essence"], count = {};
     for (const g of state.goals) if (!base.some(b => labelKey(b) === labelKey(g.name))) base.push(g.name);
-    for (const e of state.expenses) { const n = (e.note || "").trim(); if (n) count[n] = (count[n] || 0) + 1; }
+    for (const e of state.expenses) { if (e.kind === "in") continue; const n = (e.note || "").trim(); if (n) count[n] = (count[n] || 0) + 1; }
     const lower = base.map(s => s.toLowerCase());
     const mine = Object.entries(count).filter(([n]) => !lower.includes(n.toLowerCase())).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([n]) => n);
     return [...base, ...mine];
@@ -859,7 +896,7 @@ if (typeof document !== "undefined") (function () {
   }
   function updateSubmit() {
     const a = parseAmount($("#e-amount").value), n = $("#e-note").value.trim();
-    $("#e-submit").textContent = a ? `Ajouter ${eur(a)}${n ? " · " + n : ""}` : "Ajouter";
+    $("#e-submit").textContent = a ? `Ajouter ${kind === "in" ? "+" : ""}${eur(a)}${n ? " · " + n : ""}` : "Ajouter";
     document.querySelectorAll("#e-quick .dchip").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.v) === a)));
     document.querySelectorAll("#e-labels .dchip").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.label.toLowerCase() === n.toLowerCase())));
   }
@@ -897,26 +934,53 @@ if (typeof document !== "undefined") (function () {
   }
 
   function renderList() {
-    const items = state.expenses.filter(e => e.date.slice(0, 7) === view && (!filterCat || e.cat === filterCat) && (!filterLabel || labelKey(e.note) === filterLabel))
+    const items = state.expenses.filter(e => e.date.slice(0, 7) === view && (!filterCat || e.cat === filterCat) && (!filterLabel || (e.kind !== "in" && labelKey(e.note) === filterLabel)))
       .sort((a, b) => b.date.localeCompare(a.date) || stampCmp(b, a));
-    $("#l-title").textContent = `Dépenses de ${monthName(view).split(" ")[0]}`;
+    $("#l-title").textContent = `Opérations de ${monthName(view).split(" ")[0]}`;
     $("#l-filter").hidden = !filterCat && !filterLabel;
     if (filterCat || filterLabel) { const s = items.reduce((t, e) => t + e.amount, 0), g = state.goals.find(x => labelKey(x.name) === filterLabel); $("#l-filter-t").textContent = `${filterCat ? catName(filterCat) : g ? g.name : filterLabel} · ${eur(s)}`; }
     $("#list").innerHTML = items.map(e => {
-      const d = new Date(e.date + "T12:00:00");
-      return `<div class="item"><div class="date"><b>${d.getDate()}</b>${d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}</div>
-        <div class="what"><div class="t">${esc(e.note || catName(e.cat))}</div>${e.note && state.categories.some(c => c.id === e.cat) ? `<div class="s">${esc(catName(e.cat))}</div>` : ""}</div>
-        <div class="right"><span class="amt num">${eur(e.amount)}</span><button type="button" class="sbtn del" data-x="${e.id}">Supprimer</button></div></div>`;
-    }).join("") || `<p class="empty">${filterCat ? "Aucune dépense dans cette catégorie ce mois-ci." : filterLabel ? "Aucune dépense avec ce libellé ce mois-ci." : "Aucune dépense ce mois-ci."}</p>`;
+      const d = new Date(e.date + "T12:00:00"), cin = e.kind === "in";
+      return `<div class="item${e.pending ? " pend" : ""}${cin ? " in" : ""}"><div class="date"><b>${d.getDate()}</b>${d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}</div>
+        <div class="what"><div class="t">${esc(e.note || catName(e.cat))}</div>${(() => {
+          const sub = [e.note && state.categories.some(c => c.id === e.cat) ? esc(catName(e.cat)) : cin ? "Crédit" : "", e.pending ? `<span class="pill">${cin ? "à recevoir" : "en attente"}</span>` : ""].filter(Boolean).join(" ");
+          return sub ? `<div class="s">${sub}</div>` : "";
+        })()}</div>
+        <div class="right"><span class="amt num${cin ? " in" : ""}">${cin ? "+" : ""}${eur(e.amount)}</span><button type="button" class="sbtn del" data-x="${e.id}">Supprimer</button></div></div>`;
+    }).join("") || `<p class="empty">${filterCat ? "Aucune dépense dans cette catégorie ce mois-ci." : filterLabel ? "Aucune dépense avec ce libellé ce mois-ci." : "Aucune opération ce mois-ci."}</p>`;
   }
   const stampCmp = (a, b) => (a.created || "").localeCompare(b.created || "");
+
+  /* ---------- À valider : saisi dans l'appli, mais pas encore passé sur le compte ---------- */
+  function renderPending() {
+    const rows = [];
+    // Dépenses et crédits en attente du mois affiché, et ceux oubliés les mois d'avant.
+    for (const e of state.expenses) if (e.pending && e.date.slice(0, 7) <= view)
+      rows.push({ date: e.date, name: e.note || catName(e.cat), sub: e.kind === "in" ? "Crédit à recevoir" : "Dépense", amount: e.amount, cin: e.kind === "in", btn: `data-ok="${e.id}"` });
+    // Prélèvements du mois pas encore validés (pas pour un mois à venir).
+    if (view === todayYm()) for (const d of activeDebits(state, view)) if (!d.done[view]) {
+      const dt = debitDate(d, view);
+      rows.push({ date: dt, name: d.id === SAVE_ID ? "Vers mon épargne" : d.name, sub: d.day ? `Prélèvement prévu le ${d.day}` : "Prélèvement du mois", amount: d.amount, cin: false, btn: `data-dok="${d.id}"` });
+    }
+    rows.sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name, "fr"));
+    const out = rows.filter(r => !r.cin).reduce((s, r) => s + r.amount, 0), inn = rows.filter(r => r.cin).reduce((s, r) => s + r.amount, 0);
+    $("#pend-box").hidden = !rows.length;
+    $("#pend-sum").innerHTML = (out ? `−${eur(out)}` : "") + (inn ? `${out ? " " : ""}<small>+${eur(inn)} à recevoir</small>` : "");
+    const today = ymd(new Date());
+    $("#pend").innerHTML = rows.map(r => {
+      const d = new Date(r.date + "T12:00:00"), late = r.date < today && r.date.slice(0, 7) < view;
+      return `<div class="item${r.cin ? " in" : ""}"><div class="date"><b>${d.getDate()}</b>${late ? d.toLocaleDateString("fr-FR", { month: "short" }).replace(".", "") : d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}</div>
+        <div class="what"><div class="t">${esc(r.name)}</div><div class="s">${esc(r.sub)}</div></div>
+        <div class="right"><span class="amt num${r.cin ? " in" : ""}">${r.cin ? "+" : "−"}${eur(r.amount)}</span><button type="button" class="okbtn" ${r.btn}>${r.cin ? "Reçu" : "Débité"}</button></div></div>`;
+    }).join("");
+  }
 
   function renderStats(T, tm) {
     const prev = monthTotals(state, ymShift(view, -1));
     // Répartition : prélèvements par catégorie, dépenses par libellé
     const acc = {}, addTo = (k, v) => { acc[k] = (acc[k] || 0) + v; };
     for (const d of activeDebits(state, view)) addTo(d.id === SAVE_ID ? "Épargne" : catName(d.cat), d.amount);
-    for (const e of state.expenses) if (e.date.slice(0, 7) === view) addTo(e.note || catName(e.cat), e.amount);
+    for (const e of state.expenses) if (e.date.slice(0, 7) === view && e.kind !== "in") addTo(e.note || catName(e.cat), e.amount);
     const parts = Object.entries(acc).filter(p => p[1] > 0).sort((a, b) => b[1] - a[1]);
     const top = parts[0];
     const diff = prev.total ? Math.round((T.total - prev.total) / prev.total * 100) : null;
@@ -932,7 +996,7 @@ if (typeof document !== "undefined") (function () {
     // Graphique 6 mois
     const months = [-5, -4, -3, -2, -1, 0].map(k => ymShift(view, k));
     const vals = months.map(m => monthTotals(state, m).total);
-    const budget = T.income;
+    const budget = T.income + T.credits;
     const W = 600, H = 220, L = 46, R = 10, Tp = 22, B = 28;
     const max = Math.max(budget, ...vals, 1) * 1.12;
     const step = niceStep(max / 4);
@@ -1014,27 +1078,61 @@ if (typeof document !== "undefined") (function () {
   $("#e-labels").addEventListener("click", e => { const b = e.target.closest("[data-label]"); if (!b) return; $("#e-note").value = b.dataset.label; updateSubmit(); if (!parseAmount($("#e-amount").value)) $("#e-amount").focus(); });
   $("#e-note").addEventListener("input", updateSubmit);
   $("#e-amount").addEventListener("input", updateSubmit);
+  /* Dépense ou crédit (rentrée d'argent ponctuelle : remboursement, virement reçu…). */
+  function setKind(k) {
+    kind = k;
+    document.querySelectorAll(".kind button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.kind === k)));
+    $("#e-title").textContent = k === "in" ? "Nouveau crédit" : "Nouvelle dépense";
+    $("#e-note").placeholder = k === "in" ? "Ex. Remboursement" : "Ex. Nourriture";
+    $("#e-cleared-t").textContent = k === "in" ? "Déjà reçu sur mon compte" : "Déjà débité sur mon compte";
+    $("#e-quick").hidden = $("#e-labels").hidden = k === "in";
+    updateSubmit();
+  }
+  document.querySelector(".kind").addEventListener("click", e => { const b = e.target.closest("[data-kind]"); if (b) setKind(b.dataset.kind); });
   $("#f-exp").addEventListener("submit", e => {
     e.preventDefault();
     const amount = parseAmount($("#e-amount").value), date = $("#e-date").value, m = $("#e-msg");
     if (!amount) { m.hidden = false; m.textContent = "Indiquez un montant, par exemple 12,50."; $("#e-amount").focus(); return; }
     const note = $("#e-note").value.trim();
-    if (!note) { m.hidden = false; m.textContent = "Indiquez un libellé, par exemple Nourriture ou Essence."; $("#e-note").focus(); return; }
+    if (!note) { m.hidden = false; m.textContent = kind === "in" ? "Indiquez un libellé, par exemple Remboursement." : "Indiquez un libellé, par exemple Nourriture ou Essence."; $("#e-note").focus(); return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { m.hidden = false; m.textContent = "Choisissez une date."; return; }
     m.hidden = true;
     const t = nowIso();
-    state.expenses.push({ id: "e" + uid(), date, amount, cat: "", note, created: t, updated: t });
+    // Par défaut l'opération est « en attente » : elle sera validée quand elle passera vraiment sur le compte.
+    const pending = !$("#e-cleared").checked, cin = kind === "in";
+    state.expenses.push({ id: "e" + uid(), date, amount, kind, pending, cat: "", note, created: t, updated: t });
     save();
     const ym = date.slice(0, 7);
     if (ym !== view) view = ym;
-    $("#e-amount").value = ""; $("#e-note").value = "";
+    $("#e-amount").value = ""; $("#e-note").value = ""; $("#e-cleared").checked = false;
     render();
-    const T = monthTotals(state, ym), r = T.income - T.total;
+    const T = monthTotals(state, ym), r = T.income + T.credits - T.total;
+    const wait = pending ? (cin ? " · à recevoir" : " · en attente de débit") : "";
+    if (cin) { toast(`${note} : +${eur(amount)}${wait} · il vous reste ${r < 0 ? "−" : ""}${eur(Math.abs(r))}`); setKind("out"); return; }
+    if (pending) { const goal = state.goals.find(g => labelKey(g.name) === labelKey(note)); toast(goal ? `${note} : ${eur(amount)}${wait} · ${goalStatus(goal, goalSpent(state, ym)[goal.id])}` : `${note} : ${eur(amount)}${wait} · il vous reste ${r < 0 ? "−" : ""}${eur(Math.abs(r))}`); return; }
     const goal = state.goals.find(g => labelKey(g.name) === labelKey(note));
     if (goal) { toast(`${note} : ${eur(amount)} · ${goalStatus(goal, goalSpent(state, ym)[goal.id])}`); return; }
-    toast(!T.income ? `${note} : ${eur(amount)} ajoutés` : r >= 0 ? `${note} : ${eur(amount)} · il vous reste ${eur(r)} ce mois-ci` : `${note} : ${eur(amount)} · vous êtes à −${eur(-r)} ce mois-ci`);
+    toast(!(T.income + T.credits) ? `${note} : ${eur(amount)} ajoutés` : r >= 0 ? `${note} : ${eur(amount)} · il vous reste ${eur(r)} ce mois-ci` : `${note} : ${eur(amount)} · vous êtes à −${eur(-r)} ce mois-ci`);
+  });
+  /* Validation : l'opération est vraiment passée sur le compte. */
+  function clearExpense(id) {
+    const x = state.expenses.find(i => i.id === id); if (!x) return;
+    x.pending = false; x.updated = nowIso(); save(); render();
+    toast(`${x.note} : ${x.kind === "in" ? "+" + eur(x.amount) + " reçus" : eur(x.amount) + " débités"}`, "Annuler", () => { x.pending = true; x.updated = nowIso(); save(); render(); });
+  }
+  function clearDebit(id, on) {
+    const d = state.debits.find(i => i.id === id); if (!d) return;
+    const ym = view, name = d.id === SAVE_ID ? "Épargne" : d.name;
+    const set = v => { if (v) d.done[ym] = nowIso(); else delete d.done[ym]; d.updated = nowIso(); save(); render(); };
+    set(on);
+    toast(on ? `${name} : ${eur(d.amount)} débités en ${monthName(ym).split(" ")[0]}` : `${name} : de nouveau en attente`, "Annuler", () => set(!on));
+  }
+  $("#pend").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.ok) clearExpense(b.dataset.ok); else if (b.dataset.dok) clearDebit(b.dataset.dok, true);
   });
   $("#list").addEventListener("click", e => {
+    const ok = e.target.closest("[data-ok]"); if (ok) { clearExpense(ok.dataset.ok); return; }
     const b = e.target.closest("[data-x]"); if (!b) return;
     if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer"; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = "Supprimer"; } }, 3000); return; }
     const x = state.expenses.find(i => i.id === b.dataset.x);
@@ -1161,6 +1259,8 @@ if (typeof document !== "undefined") (function () {
   });
   $("#debits").addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.dok) { clearDebit(b.dataset.dok, true); return; }
+    if (b.dataset.dundo) { clearDebit(b.dataset.dundo, false); return; }
     if (b.dataset.gosave !== undefined) { setTab("save"); svEdit = true; fillSave(); renderSavings(); $("#sv-in-month").focus(); return; }
     if (b.dataset.dedit) { editDebit = editDebit === b.dataset.dedit ? "" : b.dataset.dedit; renderDebits(); return; }
     if (b.dataset.dcancel !== undefined) { editDebit = ""; renderDebits(); return; }
