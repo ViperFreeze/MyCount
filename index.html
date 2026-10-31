@@ -91,6 +91,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .gauge{position:relative;height:16px;border-radius:6px;background:var(--sunk);border:1px solid var(--line);overflow:visible}
 .gauge .f{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--accent)}
 .gauge .f.warn{background:var(--warn)} .gauge .f.bad{background:var(--danger)}
+.gauge .fr{position:absolute;inset:0 auto 0 0;border-radius:5px;background:repeating-linear-gradient(135deg,var(--accent) 0 3px,transparent 3px 7px);opacity:.45}
 .gauge .fd{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--ink);opacity:.28}
 .left-label{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:-10px}
 .income{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
@@ -113,8 +114,6 @@ button,input,select,textarea{font:inherit;color:inherit}
 .im-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media (max-width:420px){.im-acts{grid-template-columns:1fr}}
 .calc .v.res{color:var(--muted)}
-.calc .free{font-weight:600}
-.calc .v.neg-v{color:var(--danger)}
 .dgroup{display:flex;flex-direction:column;gap:2px;padding:12px 0;border-top:1px solid var(--line)}
 .dgroup:first-child{border-top:0;padding-top:2px}
 .dgroup .cat-top{margin-bottom:4px}
@@ -418,7 +417,7 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
       <div class="field"><label for="income-in">Vos revenus par mois (salaire, bourse, aides…)</label><input id="income-in" inputmode="decimal" placeholder="1 200"></div>
       <button class="primary" type="submit">Enregistrer</button>
     </form>
-    <div class="gauge" aria-hidden="true"><div class="fd" id="g-debit"></div><div class="f" id="g-fill"></div></div>
+    <div class="gauge" aria-hidden="true"><div class="fd" id="g-debit"></div><div class="f" id="g-fill"></div><div class="fr" id="g-res"></div></div>
     <div class="scale"><span id="sc-a"></span><span id="sc-b"></span></div>
     <div class="calc" id="calc"></div>
     <form class="dform inc-month" id="inc-month" hidden novalidate>
@@ -862,7 +861,8 @@ if (typeof document !== "undefined") (function () {
     // Budget réel : revenus + crédits − tout ce qui sort (y compris ce qui n'est pas encore débité).
     const inTot = T.income + T.credits;
     const left = inTot - T.total;
-    const reserve = goalReserve(state, view), free = left - reserve;
+    // Objectifs de dépenses : la part pas encore dépensée de chaque plafond est comptée comme déjà prévue (sauf pour un mois terminé).
+    const reserve = tm.kind === "past" ? 0 : goalReserve(state, view), rem = left - reserve;
     const mon = monthName(view).split(" ")[0];
     $("#h-month").textContent = monthName(view);
     $("#m-next").disabled = view >= ymShift(todayYm(), 1);
@@ -870,23 +870,24 @@ if (typeof document !== "undefined") (function () {
 
     // Ce qui reste = revenus − prélèvements − dépenses
     const has = inTot > 0, fl = $("#f-left"), st = $("#f-status");
-    $(".left-label").textContent = tm.kind === "past" ? `Il vous est resté en ${mon}` : tm.kind === "future" ? `Il vous restera en ${mon}, avant dépenses` : "Il vous reste ce mois-ci";
-    fl.textContent = has ? (left < 0 ? "−" : "") + eurR(Math.abs(left)) : "–";
-    fl.classList.toggle("neg", has && left < 0);
-    const proj = tm.kind === "current" && T.spent > 0 ? inTot - T.debits - Math.round(T.spent / tm.elapsed * tm.dim) : left;
-    const lv = !has ? "" : left < 0 ? "bad" : proj < 0 ? "warn" : "ok";
+    $(".left-label").textContent = tm.kind === "past" ? `Il vous est resté en ${mon}` : tm.kind === "future" ? `Il vous restera en ${mon}` : "Il vous reste ce mois-ci";
+    fl.textContent = has ? (rem < 0 ? "−" : "") + eurR(Math.abs(rem)) : "–";
+    fl.classList.toggle("neg", has && rem < 0);
+    const proj = Math.min(rem, tm.kind === "current" && T.spent > 0 ? inTot - T.debits - Math.round(T.spent / tm.elapsed * tm.dim) : rem);
+    const lv = !has ? "" : rem < 0 ? "bad" : proj < 0 ? "warn" : "ok";
     st.hidden = !has; st.className = "chip " + lv;
     st.textContent = lv === "bad" ? "Dans le rouge" : lv === "warn" ? "Rythme trop élevé" : tm.kind === "future" ? "Prévision" : "Ça va";
     const hasInc = state.income.amount > 0 || hasOwnInc(view);
     $("#income-t").textContent = "Indiquez vos revenus pour savoir ce qui vous reste.";
     $("#income-view").hidden = $("#income-form").hidden = hasInc;
 
-    const base = Math.max(inTot, T.total, 1);
-    const wd = T.debits / base * 100, we = T.spent / base * 100;
+    const base = Math.max(inTot, T.total + reserve, 1);
+    const wd = T.debits / base * 100, we = T.spent / base * 100, wr = reserve / base * 100;
     $("#g-debit").style.width = Math.min(100, wd) + "%";
     const gf = $("#g-fill"); gf.style.left = Math.min(100, wd) + "%"; gf.style.width = Math.max(0, Math.min(100 - wd, we)) + "%";
+    const gr = $("#g-res"); gr.style.left = Math.min(100, wd + we) + "%"; gr.style.width = Math.max(0, Math.min(100 - wd - we, wr)) + "%";
     gf.className = "f" + (lv === "bad" ? " bad" : lv === "warn" ? " warn" : "");
-    $("#sc-a").textContent = has ? `${nf0.format(Math.round(T.total / inTot * 100))} % des revenus utilisés` : `${eurR(T.total)} sortis`;
+    $("#sc-a").textContent = has ? `${nf0.format(Math.round((T.total + reserve) / inTot * 100))} % des revenus ${reserve ? "utilisés ou prévus" : "utilisés"}` : `${eurR(T.total)} sortis`;
     $("#sc-b").textContent = has ? eurR(inTot) : "";
     // Ce qui reste = revenus + crédits − ce qui est déjà débité − ce qui va encore partir (prélèvements à venir, dépenses en attente).
     const pendDeb = activeDebits(state, view).filter(d => !d.done[view] && view >= todayYm()).reduce((s, d) => s + d.amount, 0), pendExp = T.pendOut - pendDeb;
@@ -897,10 +898,8 @@ if (typeof document !== "undefined") (function () {
       (T.credits ? line("Crédits", "+" + eur(T.credits), "in", T.pendIn ? `dont ${eur(T.pendIn)} à recevoir` : "") : "") +
       line("Déjà débité", (T.done ? "−" : "") + eur(T.done)) +
       (T.pendOut || tm.kind !== "past" ? line(tm.kind === "past" ? "Pas encore validé" : "À venir", (T.pendOut ? "−" : "") + eur(T.pendOut), T.pendOut ? "wait" : "", waitSub) : "") +
-      line(tm.kind === "past" ? "Il vous est resté" : "Il vous reste", (left < 0 ? "−" : "") + eur(Math.abs(left)), "tot") +
-      // Reste après objectifs : on met de côté ce qui est encore prévu pour les objectifs de dépenses du mois.
-      (reserve && tm.kind !== "past" ? line("Encore prévu pour vos objectifs", "−" + eur(reserve), "res", "part non dépensée de vos plafonds du mois") +
-        `<div class="cl free"><span>Libre après objectifs<small>ce que vous pouvez encore dépenser hors objectifs</small></span><span class="v${free < 0 ? " neg-v" : ""}">${free < 0 ? "−" : ""}${eur(Math.abs(free))}</span></div>` : "");
+      (reserve ? line("Prévu pour vos objectifs", "−" + eur(reserve), "res", "ce qui reste à dépenser sur vos plafonds du mois") : "") +
+      line(tm.kind === "past" ? "Il vous est resté" : "Il vous reste", (rem < 0 ? "−" : "") + eur(Math.abs(rem)), "tot");
     const showCalc = has || state.income.amount > 0 || hasOwnInc(view);
     $("#calc").hidden = !showCalc;
     if (!showCalc) $("#inc-month").hidden = true;
@@ -1403,7 +1402,7 @@ if (typeof document !== "undefined") (function () {
     if (ym !== view) view = ym;
     $("#e-amount").value = ""; $("#e-note").value = ""; $("#e-cleared").checked = false;
     render();
-    const T = monthTotals(state, ym), r = T.income + T.credits - T.total;
+    const T = monthTotals(state, ym), r = T.income + T.credits - T.total - (ym >= todayYm() ? goalReserve(state, ym) : 0);
     const wait = pending ? (cin ? " · à recevoir" : " · en attente de débit") : "";
     if (cin) { toast(`${note} : +${eur(amount)}${wait} · il vous reste ${r < 0 ? "−" : ""}${eur(Math.abs(r))}`); setKind("out"); return; }
     const cg = state.categories.find(c => c.id === cat && c.goal), cgS = cg ? (x => x.exp + x.deb)(catSpent(state, ym)[cg.id]) : 0;
