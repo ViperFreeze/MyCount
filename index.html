@@ -88,11 +88,16 @@ button,input,select,textarea{font:inherit;color:inherit}
 .chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.warn{background:var(--warn-soft);color:var(--warn)} .chip.bad{background:var(--danger-soft);color:var(--danger)}
 
 /* Gauge: spent share of the month's total budget, with a "today" tick */
-.gauge{position:relative;height:16px;border-radius:6px;background:var(--sunk);border:1px solid var(--line);overflow:visible}
-.gauge .f{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--accent)}
-.gauge .f.warn{background:var(--warn)} .gauge .f.bad{background:var(--danger)}
-.gauge .fr{position:absolute;inset:0 auto 0 0;border-radius:5px;background:repeating-linear-gradient(135deg,var(--accent) 0 3px,transparent 3px 7px);opacity:.45}
-.gauge .fd{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--ink);opacity:.28}
+.gauge{position:relative;height:16px;border-radius:6px;background:var(--sunk);border:1px solid var(--line);overflow:hidden}
+.gauge .fd{position:absolute;inset:0 auto 0 0;border-radius:5px 0 0 5px;background:var(--ink);opacity:.55}
+.gauge .fd.warn{background:var(--warn);opacity:1} .gauge .fd.bad{background:var(--danger);opacity:1}
+.gauge .f{position:absolute;inset:0 auto 0 0;background:var(--accent)}
+.glegend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11px;color:var(--muted);margin-top:-8px}
+.glegend span{display:inline-flex;align-items:center;gap:5px}
+.glegend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.glegend .k-done{background:var(--ink);opacity:.55} .glegend .k-pend{background:var(--accent)}
+.glegend .k-res{background:repeating-linear-gradient(135deg,var(--accent) 0 2px,transparent 2px 4px);opacity:.6;border:1px solid var(--line)}
+.gauge .fr{position:absolute;inset:0 auto 0 0;background:repeating-linear-gradient(135deg,var(--accent) 0 3px,transparent 3px 7px);opacity:.45}
 .left-label{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:-10px}
 .income{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
 .income b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
@@ -241,6 +246,7 @@ textarea{width:100%;min-height:84px;padding:10px 11px;border:1px solid var(--lin
 /* Opérations en attente de débit / crédits */
 .amt.in{color:var(--ok)}
 .pill{display:inline-block;font-size:11px;font-weight:600;padding:0 7px;border-radius:999px;background:var(--warn-soft);color:var(--warn)}
+.okbtn.armed{background:var(--ok);color:var(--surface);border-color:var(--ok)}
 .okbtn{border:1px solid var(--ok);background:var(--ok-soft);color:var(--ok);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
 #pend-box{border-color:var(--warn)}
 #pend-box.calm{border-color:var(--line)}
@@ -418,6 +424,7 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
       <button class="primary" type="submit">Enregistrer</button>
     </form>
     <div class="gauge" aria-hidden="true"><div class="fd" id="g-debit"></div><div class="f" id="g-fill"></div><div class="fr" id="g-res"></div></div>
+    <div class="glegend" aria-hidden="true"><span><i class="k-done"></i>Débité</span><span><i class="k-pend"></i>Pas encore débité</span><span id="gl-res"><i class="k-res"></i>Prévu objectifs</span></div>
     <div class="scale"><span id="sc-a"></span><span id="sc-b"></span></div>
     <div class="calc" id="calc"></div>
     <form class="dform inc-month" id="inc-month" hidden novalidate>
@@ -472,7 +479,7 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
   <section class="panel" id="p-log" role="tabpanel" aria-labelledby="t-log">
     <div class="box" id="pend-box" hidden>
       <div class="pot-head"><h2>À valider</h2><span class="pot-sum num pend-sum" id="pend-sum"></span></div>
-      <p class="hint">Touchez « Débité » quand l'opération apparaît vraiment sur votre compte en banque.</p>
+      <p class="hint">Touchez deux fois « Débité » quand l'opération apparaît vraiment sur votre compte en banque.</p>
       <div class="list" id="pend"></div>
       <details class="validated" id="val-box" hidden>
         <summary id="val-sum"></summary>
@@ -881,12 +888,14 @@ if (typeof document !== "undefined") (function () {
     $("#income-t").textContent = "Indiquez vos revenus pour savoir ce qui vous reste.";
     $("#income-view").hidden = $("#income-form").hidden = hasInc;
 
+    // Jauge : déjà débité, puis en bleu ce qui n'est pas encore débité, puis ce qui est prévu pour les objectifs.
     const base = Math.max(inTot, T.total + reserve, 1);
-    const wd = T.debits / base * 100, we = T.spent / base * 100, wr = reserve / base * 100;
-    $("#g-debit").style.width = Math.min(100, wd) + "%";
+    const wd = T.done / base * 100, we = T.pendOut / base * 100, wr = reserve / base * 100;
+    const gd = $("#g-debit"); gd.style.width = Math.min(100, wd) + "%";
+    gd.className = "fd" + (lv === "bad" ? " bad" : lv === "warn" ? " warn" : "");
     const gf = $("#g-fill"); gf.style.left = Math.min(100, wd) + "%"; gf.style.width = Math.max(0, Math.min(100 - wd, we)) + "%";
     const gr = $("#g-res"); gr.style.left = Math.min(100, wd + we) + "%"; gr.style.width = Math.max(0, Math.min(100 - wd - we, wr)) + "%";
-    gf.className = "f" + (lv === "bad" ? " bad" : lv === "warn" ? " warn" : "");
+    $("#gl-res").hidden = !reserve;
     $("#sc-a").textContent = has ? `${nf0.format(Math.round((T.total + reserve) / inTot * 100))} % des revenus ${reserve ? "utilisés ou prévus" : "utilisés"}` : `${eurR(T.total)} sortis`;
     $("#sc-b").textContent = has ? eurR(inTot) : "";
     // Ce qui reste = revenus + crédits − ce qui est déjà débité − ce qui va encore partir (prélèvements à venir, dépenses en attente).
@@ -1434,12 +1443,22 @@ if (typeof document !== "undefined") (function () {
     const b = e.target.closest("button"); if (!b) return;
     if (b.dataset.unok) unclearExpense(b.dataset.unok); else if (b.dataset.dundo) clearDebit(b.dataset.dundo, false);
   });
+  /* Valider demande deux appuis : le 1er arme le bouton (« Confirmer ? »), le 2e valide. Sans 2e appui, il se désarme après 3 s. */
+  function confirmTap(b) {
+    if (b.dataset.armed === "1") return true;
+    const label = b.textContent;
+    document.querySelectorAll('.okbtn[data-armed="1"]').forEach(x => { x.dataset.armed = ""; x.classList.remove("armed"); x.textContent = x.dataset.label || x.textContent; });
+    b.dataset.armed = "1"; b.dataset.label = label; b.classList.add("armed"); b.textContent = "Confirmer ?";
+    setTimeout(() => { if (b.isConnected && b.dataset.armed === "1") { b.dataset.armed = ""; b.classList.remove("armed"); b.textContent = label; } }, 3000);
+    return false;
+  }
   $("#pend").addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
+    if ((b.dataset.ok || b.dataset.dok) && !confirmTap(b)) return;
     if (b.dataset.ok) clearExpense(b.dataset.ok); else if (b.dataset.dok) clearDebit(b.dataset.dok, true);
   });
   $("#list").addEventListener("click", e => {
-    const ok = e.target.closest("[data-ok]"); if (ok) { clearExpense(ok.dataset.ok); return; }
+    const ok = e.target.closest("[data-ok]"); if (ok) { if (confirmTap(ok)) clearExpense(ok.dataset.ok); return; }
     const b = e.target.closest("[data-x]"); if (!b) return;
     if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer"; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = "Supprimer"; } }, 3000); return; }
     const x = state.expenses.find(i => i.id === b.dataset.x);
@@ -1644,7 +1663,7 @@ if (typeof document !== "undefined") (function () {
   });
   $("#debits").addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
-    if (b.dataset.dok) { clearDebit(b.dataset.dok, true); return; }
+    if (b.dataset.dok) { if (confirmTap(b)) clearDebit(b.dataset.dok, true); return; }
     if (b.dataset.dundo) { clearDebit(b.dataset.dundo, false); return; }
     if (b.dataset.gosave !== undefined) { setTab("save"); svEdit = true; fillSave(); renderSavings(); $("#sv-in-month").focus(); return; }
     if (b.dataset.dedit) { editDebit = editDebit === b.dataset.dedit ? "" : b.dataset.dedit; renderDebits(); return; }
