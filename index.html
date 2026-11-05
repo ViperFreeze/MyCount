@@ -545,6 +545,18 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
       </form>
     </div>
     <div class="box">
+      <h2>Transférer vers le mois</h2>
+      <p class="hint">Sortez une somme de votre épargne : elle est ajoutée en crédit reçu sur le mois et retirée de votre épargne.</p>
+      <form id="f-xfer" class="dform" novalidate>
+        <div class="two">
+          <div class="field"><label for="xf-amount">Montant (€)</label><input id="xf-amount" inputmode="decimal" placeholder="50"></div>
+          <div class="field"><label for="xf-date">Date</label><input id="xf-date" type="date"></div>
+        </div>
+        <div class="msg" id="xf-msg" hidden></div>
+        <button class="primary" type="submit">Transférer</button>
+      </form>
+    </div>
+    <div class="box">
       <h2>Prévisions</h2>
       <p class="hint" id="fc-sum"></p>
       <div class="eta" id="fc"></div>
@@ -607,7 +619,7 @@ const WalletCore = (() => {
       .filter(e => e && typeof e.id === "string" && okYmd(e.date) && cents(e.amount) > 0)
       // kind : "out" dépense, "in" crédit (rentrée d'argent). pending : saisie mais pas encore passée sur le compte.
       // Les anciennes saisies (sans ces champs) sont des dépenses considérées comme débitées.
-      .map(e => ({ id: e.id, date: e.date, amount: cents(e.amount), kind: e.kind === "in" ? "in" : "out", pending: e.pending === true, cleared: typeof e.cleared === "string" ? e.cleared : "", cat: typeof e.cat === "string" ? e.cat : "", note: typeof e.note === "string" ? e.note.slice(0, 80) : "", created: e.created || "", updated: e.updated || "" }));
+      .map(e => ({ id: e.id, date: e.date, amount: cents(e.amount), kind: e.kind === "in" ? "in" : "out", pending: e.pending === true, cleared: typeof e.cleared === "string" ? e.cleared : "", cat: typeof e.cat === "string" ? e.cat : "", note: typeof e.note === "string" ? e.note.slice(0, 80) : "", src: e.src === "save" ? "save" : "", created: e.created || "", updated: e.updated || "" }));
     const pots = (Array.isArray(d.pots) ? d.pots : [])
       .filter(p => p && typeof p.id === "string" && typeof p.name === "string" && p.name.trim() && cents(p.target) > 0)
       .map(p => ({ id: p.id, name: p.name.trim().slice(0, 40), target: cents(p.target), deadline: typeof p.deadline === "string" && /^\d{4}-\d{2}$/.test(p.deadline) ? p.deadline : "", created: p.created || "", updated: p.updated || "" }));
@@ -947,6 +959,9 @@ if (typeof document !== "undefined") (function () {
     const d = saveDebit();
     let bal = state.saving.base;
     if (d) for (let ym = d.since, i = 0; ym <= todayYm() && i < 600; ym = ymShift(ym, 1), i++) if (saveCounted(d, ym)) bal += d.amount;
+    // Transferts de l'épargne vers le mois (crédits « Depuis mon épargne ») faits après la saisie de « Ce que j'ai ».
+    const upd = state.saving.updated;
+    for (const e of state.expenses) if (e.src === "save" && (!upd || (e.created || "") > upd)) bal -= e.amount;
     return bal;
   }
 
@@ -1581,6 +1596,29 @@ if (typeof document !== "undefined") (function () {
     }
     svEdit = false; save(); render();
     toast(monthly ? `Épargne : ${eur(monthly)} prélevés chaque mois` : "Épargne mise à jour");
+  });
+
+  /* Transfert de l'épargne vers le mois : un crédit déjà reçu, retiré de l'épargne (voir savedNow). */
+  $("#xf-date").value = ymd(new Date());
+  $("#f-xfer").addEventListener("submit", e => {
+    e.preventDefault();
+    const m = $("#xf-msg"), amount = parseAmount($("#xf-amount").value), date = $("#xf-date").value, have = savedNow();
+    const err = t => { m.hidden = false; m.textContent = t; };
+    if (!amount) { $("#xf-amount").focus(); return err("Indiquez un montant, par exemple 50."); }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return err("Choisissez une date.");
+    if (amount > have) return err(`Vous n'avez que ${eur(have)} d'épargne.`);
+    m.hidden = true;
+    const t = nowIso();
+    const x = { id: "e" + uid(), date, amount, kind: "in", pending: false, cleared: t, cat: "", note: "Depuis mon épargne", src: "save", created: t, updated: t };
+    state.expenses.push(x);
+    save();
+    view = date.slice(0, 7);
+    $("#xf-amount").value = ""; $("#xf-date").value = ymd(new Date());
+    render();
+    const T = monthTotals(state, view), r = T.income + T.got - T.total - (view >= todayYm() ? goalReserve(state, view) : 0);
+    toast(`+${eur(amount)} sur ${monthName(view).split(" ")[0]} · il vous reste ${r < 0 ? "−" : ""}${eur(Math.abs(r))}`, "Annuler", () => {
+      state.expenses = state.expenses.filter(i => i.id !== x.id); state.deleted[x.id] = nowIso(); save(); render();
+    });
   });
 
   /* ---------- Revenus ---------- */
