@@ -723,7 +723,7 @@ const WalletCore = (() => {
     for (const d of activeDebits(state, ym)) { debits += d.amount; put(d.cat, d.amount); if (!d.done[ym] && ym >= curYm) pendOut += d.amount; }
     const budget = state.categories.reduce((s, c) => s + c.budget, 0);
     // total : tout ce qui sort (prélèvements + dépenses), en attente compris. done : ce qui est déjà passé sur le compte.
-    return { by, total: spent + debits, spent, debits, orphan, budget, count, income: incomeFor(state, ym), credits, pendOut, pendIn, done: spent + debits - pendOut };
+    return { by, total: spent + debits, spent, debits, orphan, budget, count, income: incomeFor(state, ym), credits, got: credits - pendIn, pendOut, pendIn, done: spent + debits - pendOut };
   }
 
   /* Objectifs de dépenses : ce qui est dépensé dans le mois sous chaque libellé (sans tenir compte des majuscules). */
@@ -865,8 +865,9 @@ if (typeof document !== "undefined") (function () {
 
   function render() {
     const T = monthTotals(state, view), tm = timing(view);
-    // Budget réel : revenus + crédits − tout ce qui sort (y compris ce qui n'est pas encore débité).
-    const inTot = T.income + T.credits;
+    // Budget réel : revenus + crédits déjà reçus sur le compte − tout ce qui sort (y compris ce qui n'est pas encore débité).
+    // Un crédit en attente n'est compté qu'une fois validé « Reçu ».
+    const inTot = T.income + T.got;
     const left = inTot - T.total;
     // Objectifs de dépenses : la part pas encore dépensée de chaque plafond est comptée comme déjà prévue (sauf pour un mois terminé).
     const reserve = tm.kind === "past" ? 0 : goalReserve(state, view), rem = left - reserve;
@@ -898,13 +899,13 @@ if (typeof document !== "undefined") (function () {
     $("#gl-res").hidden = !reserve;
     $("#sc-a").textContent = has ? `${nf0.format(Math.round((T.total + reserve) / inTot * 100))} % des revenus ${reserve ? "utilisés ou prévus" : "utilisés"}` : `${eurR(T.total)} sortis`;
     $("#sc-b").textContent = has ? eurR(inTot) : "";
-    // Ce qui reste = revenus + crédits − ce qui est déjà débité − ce qui va encore partir (prélèvements à venir, dépenses en attente).
+    // Ce qui reste = revenus + crédits reçus − ce qui est déjà débité − ce qui va encore partir (prélèvements à venir, dépenses en attente).
     const pendDeb = activeDebits(state, view).filter(d => !d.done[view] && view >= todayYm()).reduce((s, d) => s + d.amount, 0), pendExp = T.pendOut - pendDeb;
     const waitSub = [pendDeb ? `${eur(pendDeb)} de prélèvements` : "", pendExp ? `${eur(pendExp)} de dépenses en attente` : ""].filter(Boolean).join(" + ");
     const line = (label, v, cls, sub, extra) => `<div class="cl${cls === "tot" ? " tot" : ""}"><span>${label}${sub ? `<small>${sub}</small>` : ""}</span>${extra || ""}<span class="v ${cls === "tot" ? "" : cls || ""}">${v}</span></div>`;
     $("#calc").innerHTML =
       line("Revenus du mois", eur(T.income), "", hasOwnInc(view) ? "montant propre à ce mois" : "", `<button type="button" class="sbtn" id="income-edit">Modifier</button>`) +
-      (T.credits ? line("Crédits", "+" + eur(T.credits), "in", T.pendIn ? `dont ${eur(T.pendIn)} à recevoir` : "") : "") +
+      (T.credits ? line("Crédits reçus", (T.got ? "+" : "") + eur(T.got), "in", T.pendIn ? `${eur(T.pendIn)} à recevoir, pas encore compté` : "") : "") +
       line("Déjà débité", (T.done ? "−" : "") + eur(T.done)) +
       (T.pendOut || tm.kind !== "past" ? line(tm.kind === "past" ? "Pas encore validé" : "À venir", (T.pendOut ? "−" : "") + eur(T.pendOut), T.pendOut ? "wait" : "", waitSub) : "") +
       (reserve ? line("Prévu pour vos objectifs", "−" + eur(reserve), "res", "ce qui reste à dépenser sur vos plafonds du mois") : "") +
@@ -1287,7 +1288,7 @@ if (typeof document !== "undefined") (function () {
     // Graphique 6 mois
     const months = [-5, -4, -3, -2, -1, 0].map(k => ymShift(view, k));
     const vals = months.map(m => monthTotals(state, m).total);
-    const budget = T.income + T.credits;
+    const budget = T.income + T.got;
     const W = 600, H = 220, L = 46, R = 10, Tp = 22, B = 28;
     const max = Math.max(budget, ...vals, 1) * 1.12;
     const step = niceStep(max / 4);
@@ -1411,7 +1412,7 @@ if (typeof document !== "undefined") (function () {
     if (ym !== view) view = ym;
     $("#e-amount").value = ""; $("#e-note").value = ""; $("#e-cleared").checked = false;
     render();
-    const T = monthTotals(state, ym), r = T.income + T.credits - T.total - (ym >= todayYm() ? goalReserve(state, ym) : 0);
+    const T = monthTotals(state, ym), r = T.income + T.got - T.total - (ym >= todayYm() ? goalReserve(state, ym) : 0);
     const wait = pending ? (cin ? " · à recevoir" : " · en attente de débit") : "";
     if (cin) { toast(`${note} : +${eur(amount)}${wait} · il vous reste ${r < 0 ? "−" : ""}${eur(Math.abs(r))}`); setKind("out"); return; }
     const cg = state.categories.find(c => c.id === cat && c.goal), cgS = cg ? (x => x.exp + x.deb)(catSpent(state, ym)[cg.id]) : 0;
@@ -1419,7 +1420,7 @@ if (typeof document !== "undefined") (function () {
     if (pending) { const goal = state.goals.find(g => labelKey(g.name) === labelKey(note)); toast(goal ? `${note} : ${eur(amount)}${wait} · ${goalStatus(goal, goalSpent(state, ym)[goal.id])}` : `${note} : ${eur(amount)}${wait} · il vous reste ${r < 0 ? "−" : ""}${eur(Math.abs(r))}`); return; }
     const goal = state.goals.find(g => labelKey(g.name) === labelKey(note));
     if (goal) { toast(`${note} : ${eur(amount)} · ${goalStatus(goal, goalSpent(state, ym)[goal.id])}`); return; }
-    toast(!(T.income + T.credits) ? `${note} : ${eur(amount)} ajoutés` : r >= 0 ? `${note} : ${eur(amount)} · il vous reste ${eur(r)} ce mois-ci` : `${note} : ${eur(amount)} · vous êtes à −${eur(-r)} ce mois-ci`);
+    toast(!(T.income + T.got) ? `${note} : ${eur(amount)} ajoutés` : r >= 0 ? `${note} : ${eur(amount)} · il vous reste ${eur(r)} ce mois-ci` : `${note} : ${eur(amount)} · vous êtes à −${eur(-r)} ce mois-ci`);
   });
   /* Validation : l'opération est vraiment passée sur le compte. */
   function clearExpense(id) {
