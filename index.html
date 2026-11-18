@@ -374,6 +374,8 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
     <form class="drawer" id="settings" novalidate hidden>
       <h2>Réglages</h2>
       <div class="field"><label for="set-income">Revenus habituels par mois (€)</label><input id="set-income" inputmode="decimal" autocomplete="off" placeholder="1 200"></div>
+      <div class="field"><label for="set-floor">Minimum à garder sur le compte en fin de mois (€)</label><input id="set-floor" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+      <p class="rhint">Retiré du budget plaisir : ce montant reste toujours sur le compte.</p>
       <p class="msg" id="set-err" hidden></p>
       <div class="row"><button type="button" class="secondary" id="set-cancel">Fermer</button><button class="primary" type="submit">Enregistrer</button></div>
 
@@ -666,8 +668,11 @@ const WalletCore = (() => {
     // bank : solde réel saisi (centimes, négatif permis en cas de découvert) et le moment de la saisie.
     const bk = d.bank && typeof d.bank === "object" ? d.bank : {};
     const bank = { amount: Number.isInteger(cents(bk.amount)) && typeof bk.at === "string" && bk.at ? cents(bk.amount) : 0, at: typeof bk.at === "string" ? bk.at : "", updated: typeof bk.updated === "string" ? bk.updated : "" };
+    // floor : minimum à garder sur le compte en fin de mois, retiré du budget plaisir.
+    const fl = d.floor && typeof d.floor === "object" ? d.floor : {};
+    const floor = { amount: cents(fl.amount) > 0 ? cents(fl.amount) : 0, updated: typeof fl.updated === "string" ? fl.updated : "" };
     return {
-      categories, debits, income, saving, goals, bank,
+      categories, debits, income, saving, goals, bank, floor,
       expenses: expenses.filter(e => !/^x\d+$/.test(e.id)),
       pots: pots.filter(p => !DEMO_POTS.includes(p.id)),
       moves: moves.filter(m => !/^m\d+$/.test(m.id) && !DEMO_POTS.includes(m.pot)),
@@ -710,7 +715,8 @@ const WalletCore = (() => {
     for (const [k, v] of Object.entries(b.income.months)) if (!income.months[k] || v.updated > income.months[k].updated) income.months[k] = v;
     const saving = b.saving.updated > a.saving.updated ? b.saving : a.saving;
     const bank = b.bank.updated > a.bank.updated ? b.bank : a.bank;
-    const merged = { categories: union(a.categories, b.categories), debits: union(a.debits, b.debits), income, saving, bank, goals: union(a.goals, b.goals), expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted };
+    const floor = b.floor.updated > a.floor.updated ? b.floor : a.floor;
+    const merged = { categories: union(a.categories, b.categories), debits: union(a.debits, b.debits), income, saving, bank, floor, goals: union(a.goals, b.goals), expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted };
     const all = s => [...s.expenses, ...s.categories, ...s.debits, ...s.goals, ...s.pots, ...s.moves];
     const aIds = new Set(all(a).map(x => x.id));
     const added = all(merged).filter(x => !aIds.has(x.id)).length;
@@ -849,7 +855,7 @@ if (typeof document !== "undefined") (function () {
     const t = nowIso();
     const cats = [["logement", "Logement", 45000], ["courses", "Courses", 22000], ["transport", "Transport", 4500], ["sorties", "Sorties", 8000], ["abos", "Abonnements", 2500], ["shopping", "Shopping", 6000], ["sante", "Santé", 2000]]
       .map(([id, name, budget], i) => ({ id, name, budget, order: i, created: t, updated: t }));
-    return { categories: cats, debits: [], income: { amount: 0, updated: "", months: {} }, saving: { base: 0, baseDate: "", target: 0, updated: "" }, bank: { amount: 0, at: "", updated: "" }, goals: [], expenses: [], pots: [], moves: [], deleted: {} };
+    return { categories: cats, debits: [], income: { amount: 0, updated: "", months: {} }, saving: { base: 0, baseDate: "", target: 0, updated: "" }, bank: { amount: 0, at: "", updated: "" }, floor: { amount: 0, updated: "" }, goals: [], expenses: [], pots: [], moves: [], deleted: {} };
   }
 
   /* ---------- Stockage ---------- */
@@ -935,7 +941,7 @@ if (typeof document !== "undefined") (function () {
     // Ce qui reste = revenus − prélèvements − dépenses
     const has = inTot > 0, fl = $("#f-left"), st = $("#f-status");
     // Budget plaisir : avec le solde réel, ce qui restera en banque une fois passés les prélèvements du mois et les objectifs.
-    const est = tm.kind === "current" ? bankEstimate(state, todayYm()) : null, fun = est ? est.after - reserve : 0;
+    const est = tm.kind === "current" ? bankEstimate(state, todayYm()) : null, fun = est ? est.after - reserve - state.floor.amount : 0;
     $(".left-label").textContent = est ? "Budget plaisir" : tm.kind === "past" ? `Il vous est resté en ${mon}` : tm.kind === "future" ? `Il vous restera en ${mon}` : "Il vous reste ce mois-ci";
     const big = est ? fun : rem, shown = est || has;
     fl.textContent = shown ? (big < 0 ? "−" : "") + eurR(Math.abs(big)) : "–";
@@ -962,18 +968,26 @@ if (typeof document !== "undefined") (function () {
     const pendDeb = activeDebits(state, view).filter(d => !d.done[view] && view >= todayYm()).reduce((s, d) => s + d.amount, 0), pendExp = T.pendOut - pendDeb;
     const waitSub = [pendDeb ? `${eur(pendDeb)} de prélèvements` : "", pendExp ? `${eur(pendExp)} de dépenses en attente` : ""].filter(Boolean).join(" + ");
     const line = (label, v, cls, sub, extra) => `<div class="cl${cls === "tot" ? " tot" : ""}"><span>${label}${sub ? `<small>${sub}</small>` : ""}</span>${extra || ""}<span class="v ${cls === "tot" ? "" : cls || ""}">${v}</span></div>`;
-    $("#calc").innerHTML =
+    const sgn = c => (c < 0 ? "−" : "") + eur(Math.abs(c));
+    if (est) $("#calc").innerHTML =
+      line("Solde en banque", sgn(est.now), "", `saisi le ${new Date(est.at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}, mis à jour avec vos nouvelles dépenses`, `<button type="button" class="sbtn" id="bank-edit">Modifier</button>`) +
+      (est.pendOut ? line("Prélèvements à venir", "−" + eur(est.pendOut), "wait", "pas encore validés « Débité » ce mois-ci") : "") +
+      (est.pendIn ? line("Crédits à recevoir", "+" + eur(est.pendIn), "in") : "") +
+      (reserve ? line("Prévu pour vos objectifs", "−" + eur(reserve), "res", "ce qui reste à dépenser sur vos plafonds du mois") : "") +
+      (state.floor.amount ? line("Minimum à garder", "−" + eur(state.floor.amount), "", "en fin de mois, réglable dans les réglages") : "") +
+      line("Budget plaisir", sgn(fun), "tot");
+    else $("#calc").innerHTML =
       line("Revenus du mois", eur(T.income), "", hasOwnInc(view) ? "montant propre à ce mois" : "", `<button type="button" class="sbtn" id="income-edit">Modifier</button>`) +
       (T.credits ? line("Crédits reçus", (T.got ? "+" : "") + eur(T.got), "in", T.pendIn ? `${eur(T.pendIn)} à recevoir, pas encore compté` : "") : "") +
       line("Déjà débité", (T.done ? "−" : "") + eur(T.done)) +
       (T.pendOut || tm.kind !== "past" ? line(tm.kind === "past" ? "Pas encore validé" : "À venir", (T.pendOut ? "−" : "") + eur(T.pendOut), T.pendOut ? "wait" : "", waitSub) : "") +
       (reserve ? line("Prévu pour vos objectifs", "−" + eur(reserve), "res", "ce qui reste à dépenser sur vos plafonds du mois") : "") +
-      line(tm.kind === "past" ? "Il vous est resté" : est ? "Il vous reste sur les revenus du mois" : "Il vous reste", (rem < 0 ? "−" : "") + eur(Math.abs(rem)), "tot");
-    const showCalc = has || state.income.amount > 0 || hasOwnInc(view);
+      line(tm.kind === "past" ? "Il vous est resté" : "Il vous reste", (rem < 0 ? "−" : "") + eur(Math.abs(rem)), "tot");
+    const showCalc = !!est || has || state.income.amount > 0 || hasOwnInc(view);
     $("#calc").hidden = !showCalc;
     if (!showCalc) $("#inc-month").hidden = true;
 
-    renderBank(tm, reserve);
+    renderBank(tm);
     renderDebits();
     renderPending();
     renderCats(T, tm);
@@ -1702,7 +1716,7 @@ if (typeof document !== "undefined") (function () {
     if (raw && raw !== "0" && !a) { const m = $("#im-msg"); m.hidden = false; m.textContent = "Indiquez un montant en euros, par exemple 1200 ou 1450,50."; $("#im-in").focus(); return null; }
     return a;
   }
-  $("#calc").addEventListener("click", e => { if (e.target.closest("#income-edit")) openIncMonth($("#inc-month").hidden); });
+  $("#calc").addEventListener("click", e => { if (e.target.closest("#income-edit")) openIncMonth($("#inc-month").hidden); else if (e.target.closest("#bank-edit")) openBank(true); });
   $("#inc-month").addEventListener("submit", e => {
     e.preventDefault();
     const a = readIncMonth(); if (a === null) return;
@@ -1720,19 +1734,11 @@ if (typeof document !== "undefined") (function () {
   });
   $("#im-cancel").addEventListener("click", () => openIncMonth(false));
   /* ---------- Solde réel en banque (affiché en petit sous « Il vous reste ») ---------- */
-  function renderBank(tm, reserve) {
-    const v = $("#bank-view"), est = bankEstimate(state, todayYm());
-    v.hidden = tm.kind !== "current" || !$("#bank-form").hidden;
-    if (v.hidden) return;
-    if (!est) { v.innerHTML = `<button type="button" class="linkbtn" id="bank-edit">+ Indiquer mon solde en banque pour voir votre budget plaisir</button>`; return; }
-    const m = (c, cls) => `<b class="num${c < 0 ? " neg" : ""}${cls ? " " + cls : ""}">${c < 0 ? "−" : ""}${eur(Math.abs(c))}</b>`;
-    const when = new Date(est.at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
-    const amt = c => `<b class="num">${eur(c)}</b>`;
-    v.innerHTML = `<span title="Saisi le ${when}, mis à jour avec vos nouvelles dépenses et vos validations">En banque ${m(est.now)}</span>` +
-      (est.pendOut ? `<span>− ${amt(est.pendOut)} de prélèvements</span>` : "") +
-      (est.pendIn ? `<span>+ ${amt(est.pendIn)} à recevoir</span>` : "") +
-      (reserve ? `<span>− ${amt(reserve)} d'objectifs</span>` : "") +
-      `<button type="button" class="linkbtn" id="bank-edit">Modifier</button>`;
+  /* Petit lien sous le grand chiffre, seulement tant qu'aucun solde n'est saisi. Ensuite le solde se modifie dans le détail. */
+  function renderBank(tm) {
+    const v = $("#bank-view");
+    v.hidden = tm.kind !== "current" || !$("#bank-form").hidden || !!bankEstimate(state, todayYm());
+    if (!v.hidden) v.innerHTML = `<button type="button" class="linkbtn" id="bank-edit">+ Indiquer mon solde en banque pour voir votre budget plaisir</button>`;
   }
   const parseSigned = s => {
     const t = String(s).replace(/[\s\u00a0\u202f€]/g, "").replace("−", "-").replace(",", ".");
@@ -2013,6 +2019,7 @@ if (typeof document !== "undefined") (function () {
     $("#settings").hidden = !open; $("#btn-settings").setAttribute("aria-expanded", String(open));
     if (open) {
       $("#set-income").value = state.income.amount ? String(state.income.amount / 100).replace(".", ",") : "";
+      $("#set-floor").value = state.floor.amount ? String(state.floor.amount / 100).replace(".", ",") : "";
       $("#set-err").hidden = true; $("#x-msg").hidden = true; $("#xp-msg").hidden = true;
       renderReset(); renderStatus();
     }
@@ -2024,8 +2031,11 @@ if (typeof document !== "undefined") (function () {
     ev.preventDefault();
     const raw = $("#set-income").value.trim(), a = raw === "" || raw === "0" ? 0 : parseAmount(raw), m = $("#set-err");
     if (raw && raw !== "0" && !a) { m.hidden = false; m.textContent = "Indiquez vos revenus en euros, par exemple 1200 ou 1450,50."; $("#set-income").focus(); return; }
+    const rf = $("#set-floor").value.trim(), f = rf === "" || rf === "0" ? 0 : parseAmount(rf);
+    if (rf && rf !== "0" && !f) { m.hidden = false; m.textContent = "Indiquez le minimum en euros, par exemple 100."; $("#set-floor").focus(); return; }
     m.hidden = true;
     if (a !== state.income.amount) setDefaultIncome(a);
+    if (f !== state.floor.amount) state.floor = { amount: f, updated: nowIso() };
     openDrawer(false); save(); render(); toast("Réglages enregistrés");
   });
 
