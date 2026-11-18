@@ -429,7 +429,7 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
     <form class="bank-form" id="bank-form" hidden novalidate>
       <div class="field"><label for="bank-in">Solde affiché par votre banque aujourd'hui (€)</label><input id="bank-in" inputmode="decimal" autocomplete="off" placeholder="1 234,56"></div>
       <button class="primary" type="submit">Enregistrer</button>
-      <p class="fine">Il se met à jour tout seul quand vous validez « Débité » ou « Reçu ». Mettez-le à jour de temps en temps pour vérifier qu'il ne manque rien.</p>
+      <p class="fine">Les dépenses déjà faites sont comptées comme incluses dans ce solde. Il se met à jour tout seul avec vos nouvelles dépenses et quand vous validez un prélèvement « Débité » ou un crédit « Reçu ». Mettez-le à jour de temps en temps pour vérifier qu'il ne manque rien.</p>
       <div class="row"><button type="button" class="sbtn" id="bank-del" hidden>Retirer</button><button type="button" class="sbtn" id="bank-cancel">Annuler</button></div>
     </form>
     <div class="income" id="income-view"><span id="income-t"></span></div>
@@ -734,17 +734,18 @@ const WalletCore = (() => {
   /* Prélèvements en cours pour un mois donné (depuis leur création, jusqu'à leur arrêt éventuel). */
   const activeDebits = (state, ym) => state.debits.filter(d => d.since <= ym && (!d.until || ym <= d.until));
 
-  /* Solde en banque estimé : le solde saisi, puis tout ce qui a été validé (ou saisi comme déjà passé) depuis.
-     after : ce qu'il restera une fois passées les opérations en attente et les prélèvements du mois pas encore validés. */
+  /* Solde en banque estimé : le solde saisi, puis ce qui s'est passé depuis.
+     Dépenses : le solde affiché par la banque les inclut déjà (paiements CB), même pas encore validées « Débité ».
+     Seules les dépenses saisies après le solde sont retirées, une seule fois, qu'elles soient validées ou non.
+     after : ce qu'il restera une fois passés les prélèvements du mois pas encore validés et reçus les crédits attendus. */
   function bankEstimate(state, curYm) {
     const bk = state.bank; if (!bk || !bk.at) return null;
     const at = bk.at, atYm = at.slice(0, 7);
     let now = bk.amount, pendOut = 0, pendIn = 0;
     for (const e of state.expenses) {
-      const sign = e.kind === "in" ? 1 : -1;
-      if (e.pending) { if (sign > 0) pendIn += e.amount; else pendOut += e.amount; continue; }
-      const t = e.cleared || e.created || "";
-      if (t > at) now += sign * e.amount;
+      if (e.kind !== "in") { if ((e.created || "") > at) now -= e.amount; continue; }
+      if (e.pending) { pendIn += e.amount; continue; }
+      if ((e.cleared || e.created || "") > at) now += e.amount;
     }
     for (const d of state.debits) {
       for (let ym = atYm; ym <= curYm; ym = ymNext(ym)) {
@@ -933,7 +934,7 @@ if (typeof document !== "undefined") (function () {
 
     // Ce qui reste = revenus − prélèvements − dépenses
     const has = inTot > 0, fl = $("#f-left"), st = $("#f-status");
-    // Budget plaisir : avec le solde réel, ce qui restera en banque une fois passé tout ce qui est prévu (à venir + objectifs du mois).
+    // Budget plaisir : avec le solde réel, ce qui restera en banque une fois passés les prélèvements du mois et les objectifs.
     const est = tm.kind === "current" ? bankEstimate(state, todayYm()) : null, fun = est ? est.after - reserve : 0;
     $(".left-label").textContent = est ? "Budget plaisir" : tm.kind === "past" ? `Il vous est resté en ${mon}` : tm.kind === "future" ? `Il vous restera en ${mon}` : "Il vous reste ce mois-ci";
     const big = est ? fun : rem, shown = est || has;
@@ -1727,8 +1728,8 @@ if (typeof document !== "undefined") (function () {
     const m = (c, cls) => `<b class="num${c < 0 ? " neg" : ""}${cls ? " " + cls : ""}">${c < 0 ? "−" : ""}${eur(Math.abs(c))}</b>`;
     const when = new Date(est.at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
     const amt = c => `<b class="num">${eur(c)}</b>`;
-    v.innerHTML = `<span title="Saisi le ${when}, mis à jour avec vos validations">En banque ${m(est.now)}</span>` +
-      (est.pendOut ? `<span>− ${amt(est.pendOut)} à venir</span>` : "") +
+    v.innerHTML = `<span title="Saisi le ${when}, mis à jour avec vos nouvelles dépenses et vos validations">En banque ${m(est.now)}</span>` +
+      (est.pendOut ? `<span>− ${amt(est.pendOut)} de prélèvements</span>` : "") +
       (est.pendIn ? `<span>+ ${amt(est.pendIn)} à recevoir</span>` : "") +
       (reserve ? `<span>− ${amt(reserve)} d'objectifs</span>` : "") +
       `<button type="button" class="linkbtn" id="bank-edit">Modifier</button>`;
