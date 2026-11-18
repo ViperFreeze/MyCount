@@ -933,12 +933,15 @@ if (typeof document !== "undefined") (function () {
 
     // Ce qui reste = revenus − prélèvements − dépenses
     const has = inTot > 0, fl = $("#f-left"), st = $("#f-status");
-    $(".left-label").textContent = tm.kind === "past" ? `Il vous est resté en ${mon}` : tm.kind === "future" ? `Il vous restera en ${mon}` : "Il vous reste ce mois-ci";
-    fl.textContent = has ? (rem < 0 ? "−" : "") + eurR(Math.abs(rem)) : "–";
-    fl.classList.toggle("neg", has && rem < 0);
+    // Budget plaisir : avec le solde réel, ce qui restera en banque une fois passé tout ce qui est prévu (à venir + objectifs du mois).
+    const est = tm.kind === "current" ? bankEstimate(state, todayYm()) : null, fun = est ? est.after - reserve : 0;
+    $(".left-label").textContent = est ? "Budget plaisir" : tm.kind === "past" ? `Il vous est resté en ${mon}` : tm.kind === "future" ? `Il vous restera en ${mon}` : "Il vous reste ce mois-ci";
+    const big = est ? fun : rem, shown = est || has;
+    fl.textContent = shown ? (big < 0 ? "−" : "") + eurR(Math.abs(big)) : "–";
+    fl.classList.toggle("neg", shown && big < 0);
     const proj = Math.min(rem, tm.kind === "current" && T.spent > 0 ? inTot - T.debits - Math.round(T.spent / tm.elapsed * tm.dim) : rem);
-    const lv = !has ? "" : rem < 0 ? "bad" : proj < 0 ? "warn" : "ok";
-    st.hidden = !has; st.className = "chip " + lv;
+    const lv = est ? (fun < 0 ? "bad" : "ok") : !has ? "" : rem < 0 ? "bad" : proj < 0 ? "warn" : "ok";
+    st.hidden = !shown; st.className = "chip " + lv;
     st.textContent = lv === "bad" ? "Dans le rouge" : lv === "warn" ? "Rythme trop élevé" : tm.kind === "future" ? "Prévision" : "Ça va";
     const hasInc = state.income.amount > 0 || hasOwnInc(view);
     $("#income-t").textContent = "Indiquez vos revenus pour savoir ce qui vous reste.";
@@ -964,12 +967,12 @@ if (typeof document !== "undefined") (function () {
       line("Déjà débité", (T.done ? "−" : "") + eur(T.done)) +
       (T.pendOut || tm.kind !== "past" ? line(tm.kind === "past" ? "Pas encore validé" : "À venir", (T.pendOut ? "−" : "") + eur(T.pendOut), T.pendOut ? "wait" : "", waitSub) : "") +
       (reserve ? line("Prévu pour vos objectifs", "−" + eur(reserve), "res", "ce qui reste à dépenser sur vos plafonds du mois") : "") +
-      line(tm.kind === "past" ? "Il vous est resté" : "Il vous reste", (rem < 0 ? "−" : "") + eur(Math.abs(rem)), "tot");
+      line(tm.kind === "past" ? "Il vous est resté" : est ? "Il vous reste sur les revenus du mois" : "Il vous reste", (rem < 0 ? "−" : "") + eur(Math.abs(rem)), "tot");
     const showCalc = has || state.income.amount > 0 || hasOwnInc(view);
     $("#calc").hidden = !showCalc;
     if (!showCalc) $("#inc-month").hidden = true;
 
-    renderBank(tm);
+    renderBank(tm, reserve);
     renderDebits();
     renderPending();
     renderCats(T, tm);
@@ -1716,16 +1719,18 @@ if (typeof document !== "undefined") (function () {
   });
   $("#im-cancel").addEventListener("click", () => openIncMonth(false));
   /* ---------- Solde réel en banque (affiché en petit sous « Il vous reste ») ---------- */
-  function renderBank(tm) {
+  function renderBank(tm, reserve) {
     const v = $("#bank-view"), est = bankEstimate(state, todayYm());
     v.hidden = tm.kind !== "current" || !$("#bank-form").hidden;
     if (v.hidden) return;
-    if (!est) { v.innerHTML = `<button type="button" class="linkbtn" id="bank-edit">+ Indiquer mon solde en banque</button>`; return; }
+    if (!est) { v.innerHTML = `<button type="button" class="linkbtn" id="bank-edit">+ Indiquer mon solde en banque pour voir votre budget plaisir</button>`; return; }
     const m = (c, cls) => `<b class="num${c < 0 ? " neg" : ""}${cls ? " " + cls : ""}">${c < 0 ? "−" : ""}${eur(Math.abs(c))}</b>`;
     const when = new Date(est.at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
-    const wait = est.pendOut || est.pendIn;
+    const amt = c => `<b class="num">${eur(c)}</b>`;
     v.innerHTML = `<span title="Saisi le ${when}, mis à jour avec vos validations">En banque ${m(est.now)}</span>` +
-      (wait ? `<span>· après le à venir ${m(est.after)}</span>` : "") +
+      (est.pendOut ? `<span>− ${amt(est.pendOut)} à venir</span>` : "") +
+      (est.pendIn ? `<span>+ ${amt(est.pendIn)} à recevoir</span>` : "") +
+      (reserve ? `<span>− ${amt(reserve)} d'objectifs</span>` : "") +
       `<button type="button" class="linkbtn" id="bank-edit">Modifier</button>`;
   }
   const parseSigned = s => {
