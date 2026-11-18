@@ -113,6 +113,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 .gsec:first-child{padding-top:0;border-top:0}
 .gsec+.cat{border-top:0;padding-top:6px}
 .calc .tot{border-top:2px solid var(--ink);font-weight:700} .calc .tot .v{font-weight:700}
+.bank{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:-6px}
+.bank b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
+.bank b.neg{color:var(--danger)}
+.bank .linkbtn{border:0;background:none;padding:0;font:inherit;color:var(--muted);text-decoration:underline;cursor:pointer}
+.bank-form{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;font-size:13px}
+.bank-form .fine{grid-column:1/-1}
+.bank-form .row{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
 .income-form{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}
 .inc-month{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;background:var(--sunk)}
 .inc-month .field input{background:var(--surface)}
@@ -418,6 +425,13 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
 
     <div class="left-label">Il vous reste ce mois-ci</div>
     <div class="big"><span class="done num" id="f-left">–</span><span class="chip" id="f-status" hidden></span></div>
+    <div class="bank" id="bank-view" hidden></div>
+    <form class="bank-form" id="bank-form" hidden novalidate>
+      <div class="field"><label for="bank-in">Solde affiché par votre banque aujourd'hui (€)</label><input id="bank-in" inputmode="decimal" autocomplete="off" placeholder="1 234,56"></div>
+      <button class="primary" type="submit">Enregistrer</button>
+      <p class="fine">Il se met à jour tout seul quand vous validez « Débité » ou « Reçu ». Mettez-le à jour de temps en temps pour vérifier qu'il ne manque rien.</p>
+      <div class="row"><button type="button" class="sbtn" id="bank-del" hidden>Retirer</button><button type="button" class="sbtn" id="bank-cancel">Annuler</button></div>
+    </form>
     <div class="income" id="income-view"><span id="income-t"></span></div>
     <form class="income-form" id="income-form" hidden novalidate>
       <div class="field"><label for="income-in">Vos revenus par mois (salaire, bourse, aides…)</label><input id="income-in" inputmode="decimal" placeholder="1 200"></div>
@@ -649,8 +663,11 @@ const WalletCore = (() => {
     if (inc.months && typeof inc.months === "object") for (const [k, v] of Object.entries(inc.months))
       if (okYm(k) && v && typeof v === "object" && cents(v.amount) >= 0) months[k] = { amount: cents(v.amount), updated: typeof v.updated === "string" ? v.updated : "" };
     const income = { amount: cents(inc.amount) > 0 ? cents(inc.amount) : 0, updated: typeof inc.updated === "string" ? inc.updated : "", months };
+    // bank : solde réel saisi (centimes, négatif permis en cas de découvert) et le moment de la saisie.
+    const bk = d.bank && typeof d.bank === "object" ? d.bank : {};
+    const bank = { amount: Number.isInteger(cents(bk.amount)) && typeof bk.at === "string" && bk.at ? cents(bk.amount) : 0, at: typeof bk.at === "string" ? bk.at : "", updated: typeof bk.updated === "string" ? bk.updated : "" };
     return {
-      categories, debits, income, saving, goals,
+      categories, debits, income, saving, goals, bank,
       expenses: expenses.filter(e => !/^x\d+$/.test(e.id)),
       pots: pots.filter(p => !DEMO_POTS.includes(p.id)),
       moves: moves.filter(m => !/^m\d+$/.test(m.id) && !DEMO_POTS.includes(m.pot)),
@@ -692,7 +709,8 @@ const WalletCore = (() => {
     const income = { ...(b.income.updated > a.income.updated ? b.income : a.income), months: { ...a.income.months } };
     for (const [k, v] of Object.entries(b.income.months)) if (!income.months[k] || v.updated > income.months[k].updated) income.months[k] = v;
     const saving = b.saving.updated > a.saving.updated ? b.saving : a.saving;
-    const merged = { categories: union(a.categories, b.categories), debits: union(a.debits, b.debits), income, saving, goals: union(a.goals, b.goals), expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted };
+    const bank = b.bank.updated > a.bank.updated ? b.bank : a.bank;
+    const merged = { categories: union(a.categories, b.categories), debits: union(a.debits, b.debits), income, saving, bank, goals: union(a.goals, b.goals), expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted };
     const all = s => [...s.expenses, ...s.categories, ...s.debits, ...s.goals, ...s.pots, ...s.moves];
     const aIds = new Set(all(a).map(x => x.id));
     const added = all(merged).filter(x => !aIds.has(x.id)).length;
@@ -715,6 +733,31 @@ const WalletCore = (() => {
 
   /* Prélèvements en cours pour un mois donné (depuis leur création, jusqu'à leur arrêt éventuel). */
   const activeDebits = (state, ym) => state.debits.filter(d => d.since <= ym && (!d.until || ym <= d.until));
+
+  /* Solde en banque estimé : le solde saisi, puis tout ce qui a été validé (ou saisi comme déjà passé) depuis.
+     after : ce qu'il restera une fois passées les opérations en attente et les prélèvements du mois pas encore validés. */
+  function bankEstimate(state, curYm) {
+    const bk = state.bank; if (!bk || !bk.at) return null;
+    const at = bk.at, atYm = at.slice(0, 7);
+    let now = bk.amount, pendOut = 0, pendIn = 0;
+    for (const e of state.expenses) {
+      const sign = e.kind === "in" ? 1 : -1;
+      if (e.pending) { if (sign > 0) pendIn += e.amount; else pendOut += e.amount; continue; }
+      const t = e.cleared || e.created || "";
+      if (t > at) now += sign * e.amount;
+    }
+    for (const d of state.debits) {
+      for (let ym = atYm; ym <= curYm; ym = ymNext(ym)) {
+        if (!(d.since <= ym && (!d.until || ym <= d.until))) continue;
+        const t = d.done[ym];
+        if (t) { if (t > at) now -= d.amount; }
+        else if (ym < curYm) now -= d.amount; // mois terminé : forcément passé
+        else pendOut += d.amount;
+      }
+    }
+    return { now, after: now - pendOut + pendIn, pendOut, pendIn, at };
+  }
+  const ymNext = ym => { let [y, m] = ym.split("-").map(Number); m++; if (m > 12) { m = 1; y++; } return `${y}-${String(m).padStart(2, "0")}`; };
 
   /* Revenus d'un mois : le montant propre à ce mois s'il existe, sinon le montant habituel. */
   const incomeFor = (state, ym) => Object.prototype.hasOwnProperty.call(state.income.months || {}, ym) ? state.income.months[ym].amount : state.income.amount;
@@ -775,13 +818,13 @@ const WalletCore = (() => {
     return cat + label;
   }
 
-  return { normalize, merge, exportPayload, parseImport, monthTotals, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey, incomeFor, goalReserve };
+  return { normalize, merge, exportPayload, parseImport, monthTotals, bankEstimate, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey, incomeFor, goalReserve };
 })();
 if (typeof module !== "undefined") module.exports = WalletCore;
 
 if (typeof document !== "undefined") (function () {
   "use strict";
-  const { normalize, merge, exportPayload, parseImport, monthTotals, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey, incomeFor, goalReserve } = WalletCore;
+  const { normalize, merge, exportPayload, parseImport, monthTotals, bankEstimate, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey, incomeFor, goalReserve } = WalletCore;
   const LS = "mywallet-v1";
   const $ = s => document.querySelector(s);
   const pad = n => String(n).padStart(2, "0");
@@ -805,7 +848,7 @@ if (typeof document !== "undefined") (function () {
     const t = nowIso();
     const cats = [["logement", "Logement", 45000], ["courses", "Courses", 22000], ["transport", "Transport", 4500], ["sorties", "Sorties", 8000], ["abos", "Abonnements", 2500], ["shopping", "Shopping", 6000], ["sante", "Santé", 2000]]
       .map(([id, name, budget], i) => ({ id, name, budget, order: i, created: t, updated: t }));
-    return { categories: cats, debits: [], income: { amount: 0, updated: "", months: {} }, saving: { base: 0, baseDate: "", target: 0, updated: "" }, goals: [], expenses: [], pots: [], moves: [], deleted: {} };
+    return { categories: cats, debits: [], income: { amount: 0, updated: "", months: {} }, saving: { base: 0, baseDate: "", target: 0, updated: "" }, bank: { amount: 0, at: "", updated: "" }, goals: [], expenses: [], pots: [], moves: [], deleted: {} };
   }
 
   /* ---------- Stockage ---------- */
@@ -926,6 +969,7 @@ if (typeof document !== "undefined") (function () {
     $("#calc").hidden = !showCalc;
     if (!showCalc) $("#inc-month").hidden = true;
 
+    renderBank(tm);
     renderDebits();
     renderPending();
     renderCats(T, tm);
@@ -1671,6 +1715,48 @@ if (typeof document !== "undefined") (function () {
     openIncMonth(false); save(); render(); toast(`Revenus de ${monthName(view)} : montant habituel`);
   });
   $("#im-cancel").addEventListener("click", () => openIncMonth(false));
+  /* ---------- Solde réel en banque (affiché en petit sous « Il vous reste ») ---------- */
+  function renderBank(tm) {
+    const v = $("#bank-view"), est = bankEstimate(state, todayYm());
+    v.hidden = tm.kind !== "current" || !$("#bank-form").hidden;
+    if (v.hidden) return;
+    if (!est) { v.innerHTML = `<button type="button" class="linkbtn" id="bank-edit">+ Indiquer mon solde en banque</button>`; return; }
+    const m = (c, cls) => `<b class="num${c < 0 ? " neg" : ""}${cls ? " " + cls : ""}">${c < 0 ? "−" : ""}${eur(Math.abs(c))}</b>`;
+    const when = new Date(est.at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+    const wait = est.pendOut || est.pendIn;
+    v.innerHTML = `<span title="Saisi le ${when}, mis à jour avec vos validations">En banque ${m(est.now)}</span>` +
+      (wait ? `<span>· après le à venir ${m(est.after)}</span>` : "") +
+      `<button type="button" class="linkbtn" id="bank-edit">Modifier</button>`;
+  }
+  const parseSigned = s => {
+    const t = String(s).replace(/[\s\u00a0\u202f€]/g, "").replace("−", "-").replace(",", ".");
+    if (!/^-?\d+(\.\d{1,2})?$/.test(t)) return null;
+    return Math.round(Number(t) * 100);
+  };
+  function openBank(open) {
+    $("#bank-form").hidden = !open;
+    if (open) {
+      const est = bankEstimate(state, todayYm());
+      $("#bank-in").value = est ? String(est.now / 100).replace(".", ",") : "";
+      $("#bank-del").hidden = !est;
+      $("#bank-in").focus(); $("#bank-in").select();
+    }
+    render();
+  }
+  $("#bank-view").addEventListener("click", e => { if (e.target.closest("#bank-edit")) openBank(true); });
+  $("#bank-cancel").addEventListener("click", () => openBank(false));
+  $("#bank-del").addEventListener("click", () => {
+    const before = { ...state.bank };
+    state.bank = { amount: 0, at: "", updated: nowIso() }; save(); openBank(false);
+    toast("Solde en banque retiré", "Annuler", () => { state.bank = { ...before, updated: nowIso() }; save(); render(); });
+  });
+  $("#bank-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const a = parseSigned($("#bank-in").value);
+    if (a === null) { toast("Indiquez le solde en euros, par exemple 1234,56 ou −50 si vous êtes à découvert."); $("#bank-in").focus(); return; }
+    const t = nowIso(); state.bank = { amount: a, at: t, updated: t }; save(); openBank(false);
+    toast(`Solde en banque : ${a < 0 ? "−" : ""}${eur(Math.abs(a))}`);
+  });
   $("#income-form").addEventListener("submit", e => {
     e.preventDefault();
     const a = parseAmount($("#income-in").value);
