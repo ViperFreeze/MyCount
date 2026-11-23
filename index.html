@@ -255,7 +255,14 @@ textarea{width:100%;min-height:84px;padding:10px 11px;border:1px solid var(--lin
 .pill{display:inline-block;font-size:11px;font-weight:600;padding:0 7px;border-radius:999px;background:var(--warn-soft);color:var(--warn)}
 .okbtn.armed{background:var(--ok);color:var(--surface);border-color:var(--ok)}
 .okbtn{border:1px solid var(--ok);background:var(--ok-soft);color:var(--ok);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
-#pend-box{border-color:var(--warn)}
+#sort-box{border-color:var(--warn)}
+.srow{border-top:1px solid var(--line);padding:8px 0}
+.srow:first-child{border-top:0}
+.srow .item{border:0;padding:0}
+.srow .chips{margin-top:6px}
+.srow .raw{font-size:12px;color:var(--muted);margin:4px 0 0;overflow-wrap:anywhere}
+.sacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.addhand{border:0;background:none;padding:10px 0 2px;font:inherit;font-size:13px;color:var(--muted);text-decoration:underline;cursor:pointer}
 #pend-box.calm{border-color:var(--line)}
 #pend-box.calm .pend-sum,#pend-box.calm > .hint{display:none}
 .validated{border-top:1px solid var(--line);padding-top:10px}
@@ -395,6 +402,16 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
       </div>
 
       <div class="sect">
+        <h2>Notifications de la banque</h2>
+        <p class="rhint">MacroDroid, sur votre téléphone, dépose chaque notification BoursoBank dans votre Gist. MyCount les lit à chaque ouverture (et chaque minute tant qu'elle est ouverte) : vos dépenses s'ajoutent toutes seules.</p>
+        <div class="rrow" id="nt-on" hidden>
+          <div class="field"><label for="nt-id">Identifiant du Gist (à coller dans MacroDroid)</label><input id="nt-id" readonly spellcheck="false"></div>
+          <button type="button" class="secondary" id="nt-copy">Copier</button>
+        </div>
+        <p class="rhint" id="nt-hint"></p>
+      </div>
+
+      <div class="sect">
         <h2>Fichier de sauvegarde</h2>
         <p class="rhint">« Exporter » crée un fichier à vous envoyer (Drive, mail, messagerie…). « Importer » le fusionne sur un autre appareil : rien n'est écrasé, les suppressions sont reportées.</p>
         <div class="rrow">
@@ -492,28 +509,11 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
   </section>
 
   <section class="panel" id="p-log" role="tabpanel" aria-labelledby="t-log">
-    <div class="box" id="pend-box" hidden>
-      <div class="pot-head"><h2>À valider</h2><span class="pot-sum num pend-sum" id="pend-sum"></span></div>
-      <p class="hint">Touchez deux fois « Débité » quand l'opération apparaît vraiment sur votre compte en banque.</p>
-      <div class="list" id="pend"></div>
-      <details class="validated" id="val-box" hidden>
-        <summary id="val-sum"></summary>
-        <div class="list" id="val"></div>
-      </details>
+    <div class="box" id="sort-box" hidden>
+      <div class="pot-head"><h2>À ranger</h2><span class="pot-sum num" id="sort-n"></span></div>
+      <p class="hint">Lu dans les notifications de votre banque. Rangez une fois : les prochaines dépenses chez le même commerçant seront rangées toutes seules.</p>
+      <div class="list" id="sort"></div>
     </div>
-    <form class="box" id="f-exp" novalidate>
-      <h2 id="e-title">Nouvelle dépense</h2>
-      <div class="kind" role="group" aria-label="Type d'opération"><button type="button" data-kind="out" aria-pressed="true">Dépense</button><button type="button" data-kind="in" aria-pressed="false">Crédit</button></div>
-      <div class="field amount"><label for="e-amount">Montant</label><input id="e-amount" inputmode="decimal" autocomplete="off" placeholder="0,00"><span>€</span></div>
-      <div class="chips" id="e-quick"></div>
-      <div class="field"><label for="e-note">Libellé</label><input id="e-note" maxlength="80" placeholder="Ex. Nourriture" autocomplete="off"></div>
-      <div class="chips" id="e-labels" aria-label="Suggestions de libellé"></div>
-      <div class="field" id="e-cat-wrap"><span class="flabel">Catégorie (facultatif)</span><div class="chips" id="e-cats" role="group" aria-label="Catégorie de la dépense"></div></div>
-      <div class="field"><label for="e-date">Date</label><input id="e-date" type="date" required></div>
-      <label class="check"><input type="checkbox" id="e-cleared"><span id="e-cleared-t">Déjà débité sur mon compte</span></label>
-      <div class="msg" id="e-msg" hidden></div>
-      <button class="primary" type="submit" id="e-submit">Ajouter</button>
-    </form>
     <div class="box" id="goals-box">
       <div class="pot-head"><h2>Objectifs de dépenses</h2><span class="pot-sum num" id="go-sum"></span></div>
       <p class="hint">Un plafond par mois, pour une catégorie (Courses, Sorties…) ou pour un libellé (Essence, Nourriture…).</p>
@@ -535,7 +535,21 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
       <h2 id="l-title">Dépenses du mois</h2>
       <div class="filter" id="l-filter" hidden><span id="l-filter-t"></span><button type="button" class="sbtn" id="l-filter-x">Tout afficher</button></div>
       <div class="list" id="list"></div>
+      <button type="button" class="linkbtn addhand" id="e-open">+ Ajouter une opération à la main</button>
     </div>
+    <form class="box" id="f-exp" hidden novalidate>
+      <h2 id="e-title">Nouvelle dépense</h2>
+      <div class="kind" role="group" aria-label="Type d'opération"><button type="button" data-kind="out" aria-pressed="true">Dépense</button><button type="button" data-kind="in" aria-pressed="false">Crédit</button></div>
+      <div class="field amount"><label for="e-amount">Montant</label><input id="e-amount" inputmode="decimal" autocomplete="off" placeholder="0,00"><span>€</span></div>
+      <div class="chips" id="e-quick"></div>
+      <div class="field"><label for="e-note">Libellé</label><input id="e-note" maxlength="80" placeholder="Ex. Nourriture" autocomplete="off"></div>
+      <div class="chips" id="e-labels" aria-label="Suggestions de libellé"></div>
+      <div class="field" id="e-cat-wrap"><span class="flabel">Catégorie (facultatif)</span><div class="chips" id="e-cats" role="group" aria-label="Catégorie de la dépense"></div></div>
+      <div class="field"><label for="e-date">Date</label><input id="e-date" type="date" required></div>
+      <div class="msg" id="e-msg" hidden></div>
+      <button class="primary" type="submit" id="e-submit">Ajouter</button>
+      <button type="button" class="sbtn" id="e-close">Fermer</button>
+    </form>
   </section>
 
   <section class="panel" id="p-save" role="tabpanel" aria-labelledby="t-save" hidden>
@@ -632,9 +646,13 @@ const WalletCore = (() => {
       .map(c => ({ id: c.id, name: c.name.trim().slice(0, 40), budget: cents(c.budget), goal: cents(c.goal) > 0 ? cents(c.goal) : 0, order: Number(c.order) || 0, created: c.created || "", updated: c.updated || "" }));
     const expenses = (Array.isArray(d.expenses) ? d.expenses : [])
       .filter(e => e && typeof e.id === "string" && okYmd(e.date) && cents(e.amount) > 0)
-      // kind : "out" dépense, "in" crédit (rentrée d'argent). pending : saisie mais pas encore passée sur le compte.
-      // Les anciennes saisies (sans ces champs) sont des dépenses considérées comme débitées.
-      .map(e => ({ id: e.id, date: e.date, amount: cents(e.amount), kind: e.kind === "in" ? "in" : "out", pending: e.pending === true, cleared: typeof e.cleared === "string" ? e.cleared : "", cat: typeof e.cat === "string" ? e.cat : "", note: typeof e.note === "string" ? e.note.slice(0, 80) : "", src: e.src === "save" ? "save" : "", created: e.created || "", updated: e.updated || "" }));
+      // kind : "out" dépense, "in" crédit (rentrée d'argent). Plus de validation : toute opération enregistrée compte tout de suite.
+      // src "notif" : lue dans une notification de la banque (shop : commerçant d'origine, raw : texte reçu, sorted : rangée par l'utilisateur).
+      .map(e => ({ id: e.id, date: e.date, amount: cents(e.amount), kind: e.kind === "in" ? "in" : "out", pending: false, cleared: typeof e.cleared === "string" ? e.cleared : "", cat: typeof e.cat === "string" ? e.cat : "", note: typeof e.note === "string" ? e.note.slice(0, 80) : "", src: e.src === "save" || e.src === "notif" ? e.src : "", shop: typeof e.shop === "string" ? e.shop.slice(0, 80) : "", raw: typeof e.raw === "string" ? e.raw.slice(0, 400) : "", sorted: e.sorted === true, created: e.created || "", updated: e.updated || "" }));
+    // Notifications de la banque pas reconnues : à transformer à la main en dépense ou crédit, ou à ignorer.
+    const unread = (Array.isArray(d.unread) ? d.unread : [])
+      .filter(u => u && typeof u.id === "string" && typeof u.text === "string")
+      .map(u => ({ id: u.id, text: u.text.slice(0, 400), at: typeof u.at === "string" ? u.at : "", created: u.created || "", updated: u.updated || "" }));
     const pots = (Array.isArray(d.pots) ? d.pots : [])
       .filter(p => p && typeof p.id === "string" && typeof p.name === "string" && p.name.trim() && cents(p.target) > 0)
       .map(p => ({ id: p.id, name: p.name.trim().slice(0, 40), target: cents(p.target), deadline: typeof p.deadline === "string" && /^\d{4}-\d{2}$/.test(p.deadline) ? p.deadline : "", created: p.created || "", updated: p.updated || "" }));
@@ -671,7 +689,7 @@ const WalletCore = (() => {
     const fl = d.floor && typeof d.floor === "object" ? d.floor : {};
     const floor = { amount: cents(fl.amount) > 0 ? cents(fl.amount) : 0, updated: typeof fl.updated === "string" ? fl.updated : "" };
     return {
-      categories, debits, income, saving, goals, bank, floor,
+      categories, debits, income, saving, goals, bank, floor, unread,
       expenses: expenses.filter(e => !/^x\d+$/.test(e.id)),
       pots: pots.filter(p => !DEMO_POTS.includes(p.id)),
       moves: moves.filter(m => !/^m\d+$/.test(m.id) && !DEMO_POTS.includes(m.pot)),
@@ -715,7 +733,7 @@ const WalletCore = (() => {
     const saving = b.saving.updated > a.saving.updated ? b.saving : a.saving;
     const bank = b.bank.updated > a.bank.updated ? b.bank : a.bank;
     const floor = b.floor.updated > a.floor.updated ? b.floor : a.floor;
-    const merged = { categories: union(a.categories, b.categories), debits: union(a.debits, b.debits), income, saving, bank, floor, goals: union(a.goals, b.goals), expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted };
+    const merged = { categories: union(a.categories, b.categories), debits: union(a.debits, b.debits), income, saving, bank, floor, goals: union(a.goals, b.goals), unread: union(a.unread, b.unread), expenses: union(a.expenses, b.expenses), pots: union(a.pots, b.pots), moves: union(a.moves, b.moves), deleted };
     const all = s => [...s.expenses, ...s.categories, ...s.debits, ...s.goals, ...s.pots, ...s.moves];
     const aIds = new Set(all(a).map(x => x.id));
     const added = all(merged).filter(x => !aIds.has(x.id)).length;
@@ -824,6 +842,84 @@ const WalletCore = (() => {
     return cat + label;
   }
 
+  /* ---------- Notifications de la banque (BoursoBank) ----------
+     Le téléphone (MacroDroid) dépose chaque notification dans le Gist ; l'appli la lit ici.
+     Renvoie { type, amount, label, main } : type "out" dépense, "in" crédit, "debit" prélèvement,
+     "ignore" (rien à compter) ou "unknown" (pas reconnue, à traiter à la main). */
+  const AMT = /(\d{1,3}(?:[   .]\d{3})+(?:,\d{2})?|\d+(?:[.,]\d{1,2})?)\s?(?:EUR|€)/i;
+  function notifAmount(t) {
+    const m = AMT.exec(t); if (!m) return 0;
+    let v = m[1].replace(/[   ]/g, "");
+    v = v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : /\.\d{3}$/.test(v) ? v.replace(/\./g, "") : v;
+    const n = Math.round(Number(v) * 100);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+  const cleanShop = s => String(s || "").replace(/\s+-\s+.*$/, "").replace(/[.\s]+$/, "").replace(/\s+/g, " ").trim().slice(0, 60);
+  function parseNotif(text) {
+    const t = String(text || "").replace(/\s+/g, " ").trim();
+    let m;
+    if (!t) return { type: "ignore" };
+    // Demande d'authentification d'un paiement en ligne : le paiement lui-même arrive dans une autre notification.
+    if (/paiement en cours|veuillez vous authentifier|code de s[ée]curit[ée]|connexion/i.test(t)) return { type: "ignore" };
+    if ((m = /vous venez de payer .*? chez (.+)$/i.exec(t))) return { type: "out", amount: notifAmount(t), label: cleanShop(m[1]), main: true };
+    if (/approuv[ée]e/i.test(t) && /paiement/i.test(t)) { m = /commer[çc]ant (.+)$/i.exec(t); return { type: "out", amount: notifAmount(t), label: cleanShop(m ? m[1] : "Paiement carte"), main: false }; }
+    if ((m = /votre virement de .*? pour votre b[ée]n[ée]ficiaire (.+?) a [ée]t[ée] pris en compte/i.exec(t))) return { type: "out", amount: notifAmount(t), label: "Virement " + cleanShop(m[1]), main: true };
+    // Alerte « montant supérieur à … » : le montant indiqué est le seuil, pas l'opération.
+    if (/sup[ée]rieur [àa]/i.test(t)) return { type: "unknown", hint: /cr[ée]dit/i.test(t) ? "in" : "out" };
+    const amount = notifAmount(t);
+    if (!amount) return { type: "unknown" };
+    if (/pr[ée]l[èe]vement/i.test(t)) {
+      m = /(?:de la part de|[ée]mis par|en faveur de|au profit de|par|de) ([A-Z0-9][^,.]*?)(?: a [ée]t[ée]| sera|,|\.|$)/.exec(t.replace(AMT, ""));
+      return { type: "debit", amount, label: m ? "Prélèvement " + cleanShop(m[1]) : "Prélèvement" };
+    }
+    if (/retrait/i.test(t)) return { type: "out", amount, label: "Retrait", main: true };
+    if (/cr[ée]dit[ée]|re[çc]u|remboursement|virement .*de la part/i.test(t)) return { type: "in", amount, label: /rembours/i.test(t) ? "Remboursement" : "Virement reçu", main: true };
+    if (/pay|d[ée]bit|achat/i.test(t)) return { type: "out", amount, label: "Paiement carte", main: true };
+    return { type: "unknown" };
+  }
+
+  /* Ajoute des notifications à l'état. items : [{ id, text, at }] (at : date ISO de la notification).
+     - Une même dépense annoncée deux fois (« Vous venez de payer » + « opération approuvée ») n'est comptée qu'une fois.
+     - Un prélèvement qui correspond à un prélèvement prévu du mois le marque comme passé, sans le compter deux fois.
+     - Libellé et catégorie : repris de la dernière dépense chez le même commerçant.
+     Renvoie le nombre d'opérations ajoutées. */
+  function importNotifs(state, items) {
+    const seen = new Set([...state.expenses.map(e => e.id), ...state.unread.map(u => u.id), ...Object.keys(state.deleted)]);
+    const pad2 = n => String(n).padStart(2, "0");
+    const localDay = iso => { const d = new Date(iso); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+    let added = 0;
+    for (const it of [...items].sort((a, b) => a.at.localeCompare(b.at))) {
+      const id = "n" + it.id;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const r = parseNotif(it.text), at = it.at, date = localDay(at), ym = date.slice(0, 7);
+      if (r.type === "ignore") continue;
+      if (r.type === "unknown") { state.unread.push({ id, text: String(it.text).slice(0, 400), at, created: at, updated: at }); added++; continue; }
+      if (r.type === "debit") {
+        const act = state.debits.filter(x => x.since <= ym && (!x.until || ym <= x.until) && x.amount === r.amount);
+        if (act.some(x => x.done[ym] === at)) continue; // déjà traitée (autre appareil)
+        const d = act.find(x => !x.done[ym]);
+        if (d) { d.done[ym] = at; d.updated = at; continue; }
+      }
+      const kind = r.type === "in" ? "in" : "out";
+      // Dernière dépense rangée chez le même commerçant : on reprend son libellé et sa catégorie.
+      const known = shop => { const k = labelKey(shop); return kind === "out" ? state.expenses.filter(e => e.kind === "out" && e.shop && labelKey(e.shop) === k && (e.sorted || e.cat || e.note !== e.shop)).sort((a, b) => (b.created || "").localeCompare(a.created || ""))[0] : null; };
+      // Doublon : même montant, même sens, notifié à moins de 15 minutes d'écart.
+      const near = state.expenses.find(e => e.src === "notif" && e.kind === kind && e.amount === r.amount && Math.abs(new Date(e.created) - new Date(at)) <= 15 * 60000);
+      if (near) {
+        if (r.main && !parseNotif(near.raw).main && !near.sorted && near.note === near.shop) {
+          const prev = known(r.label);
+          Object.assign(near, { shop: r.label, note: prev ? prev.note : r.label, cat: prev ? prev.cat : near.cat, sorted: !!prev, raw: String(it.text).slice(0, 400), updated: at });
+        }
+        continue;
+      }
+      const prev = known(r.label);
+      state.expenses.push({ id, date, amount: r.amount, kind, pending: false, cleared: "", cat: prev ? prev.cat : "", note: prev ? prev.note : r.label, src: "notif", shop: r.label, raw: String(it.text).slice(0, 400), sorted: !!prev, created: at, updated: at });
+      added++;
+    }
+    return added;
+  }
+
   /* Ce que les objectifs prennent sur le salaire du mois, en plus des prélèvements.
      Objectif par catégorie : son plafond moins les prélèvements de la catégorie (déjà comptés à part).
      Mêmes règles que goalReserve pour ne rien compter deux fois. */
@@ -852,13 +948,13 @@ const WalletCore = (() => {
     return { T, plan, reserve, envelope, spent, left: envelope - spent };
   }
 
-  return { normalize, merge, exportPayload, parseImport, monthTotals, bankEstimate, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey, incomeFor, goalReserve, goalPlan, funBudget };
+  return { normalize, merge, exportPayload, parseImport, monthTotals, bankEstimate, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey, incomeFor, goalReserve, goalPlan, funBudget, parseNotif, importNotifs };
 })();
 if (typeof module !== "undefined") module.exports = WalletCore;
 
 if (typeof document !== "undefined") (function () {
   "use strict";
-  const { normalize, merge, exportPayload, parseImport, monthTotals, bankEstimate, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey, incomeFor, goalReserve, funBudget } = WalletCore;
+  const { normalize, merge, exportPayload, parseImport, monthTotals, bankEstimate, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey, incomeFor, goalReserve, funBudget, parseNotif, importNotifs } = WalletCore;
   const LS = "mywallet-v1";
   const $ = s => document.querySelector(s);
   const pad = n => String(n).padStart(2, "0");
@@ -882,7 +978,7 @@ if (typeof document !== "undefined") (function () {
     const t = nowIso();
     const cats = [["logement", "Logement", 45000], ["courses", "Courses", 22000], ["transport", "Transport", 4500], ["sorties", "Sorties", 8000], ["abos", "Abonnements", 2500], ["shopping", "Shopping", 6000], ["sante", "Santé", 2000]]
       .map(([id, name, budget], i) => ({ id, name, budget, order: i, created: t, updated: t }));
-    return { categories: cats, debits: [], income: { amount: 0, updated: "", months: {} }, saving: { base: 0, baseDate: "", target: 0, updated: "" }, bank: { amount: 0, at: "", updated: "" }, floor: { amount: 0, updated: "" }, goals: [], expenses: [], pots: [], moves: [], deleted: {} };
+    return { categories: cats, debits: [], income: { amount: 0, updated: "", months: {} }, saving: { base: 0, baseDate: "", target: 0, updated: "" }, bank: { amount: 0, at: "", updated: "" }, floor: { amount: 0, updated: "" }, goals: [], unread: [], expenses: [], pots: [], moves: [], deleted: {} };
   }
 
   /* ---------- Stockage ---------- */
@@ -994,7 +1090,7 @@ if (typeof document !== "undefined") (function () {
     $("#calc").innerHTML =
       line("Salaire du mois", eur(T.income), "", hasOwnInc(view) ? "montant propre à ce mois" : "", `<button type="button" class="sbtn" id="income-edit">Modifier</button>`) +
       (T.credits ? line("Crédits reçus", (T.got ? "+" : "") + eur(T.got), "in", T.pendIn ? `${eur(T.pendIn)} à recevoir, compté une fois « Reçu »` : "") : "") +
-      line("Prélèvements", minus(T.debits), "", [saveAmt ? `dont ${eur(saveAmt)} d'épargne` : "", pendDeb ? `${eur(pendDeb)} pas encore débités` : ""].filter(Boolean).join(" · ")) +
+      line("Prélèvements", minus(T.debits), "", [saveAmt ? `dont ${eur(saveAmt)} d'épargne` : "", pendDeb ? `${eur(pendDeb)} encore à venir` : ""].filter(Boolean).join(" · ")) +
       (F.plan.total ? line("Objectifs de dépenses", "−" + eur(F.plan.total), "res", goalNames) : "") +
       line("Budget plaisir du mois", sgn(env), "tot") +
       line("Dépenses plaisir", minus(Math.max(0, used)), pendExp ? "wait" : "", "hors objectifs, dépassements compris" + (pendExp ? ` · ${eur(pendExp)} en attente` : "")) +
@@ -1006,7 +1102,7 @@ if (typeof document !== "undefined") (function () {
 
     renderBank(tm);
     renderDebits();
-    renderPending();
+    renderSort();
     renderCats(T, tm);
     renderForm();
     renderGoals(tm);
@@ -1098,10 +1194,8 @@ if (typeof document !== "undefined") (function () {
     }).join("") || `<p class="empty">Aucune catégorie. Ajoutez-en une ci-dessous.</p>`;
   }
 
-  /* Statut d'un prélèvement pour le mois affiché : à valider quand il passe vraiment sur le compte. */
-  const debitSt = d => view > todayYm() ? `<span class="st">prévu</span>` : view < todayYm() ? `<span class="st ok">✓ passé</span>`
-    : d.done[view] ? `<button type="button" class="sbtn" data-dundo="${d.id}" title="Annuler la validation">✓ débité</button>`
-    : `<button type="button" class="okbtn" data-dok="${d.id}">Débité</button>`;
+  /* Statut d'un prélèvement pour le mois affiché : « passé » dès que sa notification est arrivée (ou mois terminé). */
+  const debitSt = d => view > todayYm() ? `<span class="st">prévu</span>` : view < todayYm() || d.done[view] ? `<span class="st ok">✓ passé</span>` : `<span class="st">à venir</span>`;
   function renderDebits() {
     const list = activeDebits(state, view), cats = sorted();
     const total = list.reduce((s, d) => s + d.amount, 0);
@@ -1215,9 +1309,9 @@ if (typeof document !== "undefined") (function () {
     if (filterCat || filterLabel) { const s = items.reduce((t, e) => t + e.amount, 0), g = state.goals.find(x => labelKey(x.name) === filterLabel); $("#l-filter-t").textContent = `${filterCat ? catName(filterCat) : g ? g.name : filterLabel} · ${eur(s)}`; }
     $("#list").innerHTML = items.map(e => {
       const d = new Date(e.date + "T12:00:00"), cin = e.kind === "in";
-      return `<div class="item${e.pending ? " pend" : ""}${cin ? " in" : ""}"><div class="date"><b>${d.getDate()}</b>${d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}</div>
+      return `<div class="item${cin ? " in" : ""}"><div class="date"><b>${d.getDate()}</b>${d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}</div>
         <div class="what"><div class="t">${esc(e.note || catName(e.cat))}</div>${(() => {
-          const sub = [e.note && state.categories.some(c => c.id === e.cat) ? esc(catName(e.cat)) : cin ? "Crédit" : "", e.pending ? `<span class="pill">${cin ? "à recevoir" : "en attente"}</span>` : ""].filter(Boolean).join(" ");
+          const sub = [e.note && state.categories.some(c => c.id === e.cat) ? esc(catName(e.cat)) : cin ? "Crédit" : "", e.shop && labelKey(e.shop) !== labelKey(e.note) ? esc(e.shop) : "", needsSort(e) ? `<span class="pill">à ranger</span>` : ""].filter(Boolean).join(" · ");
           return sub ? `<div class="s">${sub}</div>` : "";
         })()}</div>
         <div class="right"><span class="amt num${cin ? " in" : ""}">${cin ? "+" : ""}${eur(e.amount)}</span><button type="button" class="sbtn del" data-x="${e.id}">Supprimer</button></div></div>`;
@@ -1225,48 +1319,69 @@ if (typeof document !== "undefined") (function () {
   }
   const stampCmp = (a, b) => (a.created || "").localeCompare(b.created || "");
 
-  /* ---------- À valider : saisi dans l'appli, mais pas encore passé sur le compte ---------- */
-  function renderPending() {
-    const rows = [];
-    // Dépenses et crédits en attente du mois affiché, et ceux oubliés les mois d'avant.
-    for (const e of state.expenses) if (e.pending && e.date.slice(0, 7) <= view)
-      rows.push({ date: e.date, name: e.note || catName(e.cat), sub: e.kind === "in" ? "Crédit à recevoir" : "Dépense", amount: e.amount, cin: e.kind === "in", btn: `data-ok="${e.id}"` });
-    // Prélèvements du mois pas encore validés (pas pour un mois à venir).
-    if (view === todayYm()) for (const d of activeDebits(state, view)) if (!d.done[view]) {
-      const dt = debitDate(d, view);
-      rows.push({ date: dt, name: d.id === SAVE_ID ? "Vers mon épargne" : d.name, sub: d.day ? `Prélèvement prévu le ${d.day}` : "Prélèvement du mois", amount: d.amount, cin: false, btn: `data-dok="${d.id}"` });
-    }
-    rows.sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name, "fr"));
-    const out = rows.filter(r => !r.cin).reduce((s, r) => s + r.amount, 0), inn = rows.filter(r => r.cin).reduce((s, r) => s + r.amount, 0);
-    // Déjà validées ce mois-ci : elles restent visibles ici, avec la possibilité d'annuler.
-    const vrows = [];
-    for (const e of state.expenses) if (!e.pending && e.cleared && e.date.slice(0, 7) === view)
-      vrows.push({ date: e.date, name: e.note || catName(e.cat), sub: e.kind === "in" ? "Crédit reçu" : "Dépense débitée", amount: e.amount, cin: e.kind === "in", when: e.cleared, btn: `data-unok="${e.id}"` });
-    for (const d of activeDebits(state, view)) if (d.done[view])
-      vrows.push({ date: debitDate(d, view), name: d.id === SAVE_ID ? "Vers mon épargne" : d.name, sub: "Prélèvement débité", amount: d.amount, cin: false, when: d.done[view], btn: `data-dundo="${d.id}"` });
-    vrows.sort((a, b) => b.when.localeCompare(a.when));
-    $("#val-box").hidden = !vrows.length;
-    $("#val-sum").textContent = `✓ ${vrows.length} opération${vrows.length > 1 ? "s" : ""} validée${vrows.length > 1 ? "s" : ""} en ${monthName(view).split(" ")[0]}`;
-    $("#val").innerHTML = vrows.map(r => {
-      const d = new Date(r.date + "T12:00:00"), w = new Date(r.when);
-      return `<div class="item${r.cin ? " in" : ""}"><div class="date"><b>${d.getDate()}</b>${d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}</div>
-        <div class="what"><div class="t">${esc(r.name)}</div><div class="s">${esc(r.sub)} <span class="pill ok">validé le ${w.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</span></div></div>
-        <div class="right"><span class="amt num${r.cin ? " in" : ""}">${r.cin ? "+" : "−"}${eur(r.amount)}</span><button type="button" class="sbtn" ${r.btn}>Annuler</button></div></div>`;
-    }).join("");
-    $("#pend-box").hidden = !rows.length && !vrows.length;
-    $("#pend-box").classList.toggle("calm", !rows.length);
-    $("#pend").hidden = !rows.length;
-    $("#pend-box h2").textContent = rows.length ? "À valider" : "Opérations validées";
-    $("#val-box").open = $("#val-box").open || !rows.length;
-    $("#pend-sum").innerHTML = (out ? `−${eur(out)}` : "") + (inn ? `${out ? " " : ""}<small>+${eur(inn)} à recevoir</small>` : "");
-    const today = ymd(new Date());
-    $("#pend").innerHTML = rows.map(r => {
-      const d = new Date(r.date + "T12:00:00"), late = r.date < today && r.date.slice(0, 7) < view;
-      return `<div class="item${r.cin ? " in" : ""}"><div class="date"><b>${d.getDate()}</b>${late ? d.toLocaleDateString("fr-FR", { month: "short" }).replace(".", "") : d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}</div>
-        <div class="what"><div class="t">${esc(r.name)}</div><div class="s">${esc(r.sub)}</div></div>
-        <div class="right"><span class="amt num${r.cin ? " in" : ""}">${r.cin ? "+" : "−"}${eur(r.amount)}</span><button type="button" class="okbtn" ${r.btn}>${r.cin ? "Reçu" : "Débité"}</button></div></div>`;
-    }).join("");
+  /* ---------- À ranger : opérations lues dans les notifications, pas encore rangées ---------- */
+  const needsSort = e => e.src === "notif" && e.kind === "out" && !e.sorted && !e.cat;
+  const shortDay = iso => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  function renderSort() {
+    const exps = state.expenses.filter(needsSort).sort((a, b) => b.date.localeCompare(a.date) || stampCmp(b, a));
+    const unr = [...state.unread].sort((a, b) => b.at.localeCompare(a.at));
+    const n = exps.length + unr.length;
+    $("#sort-box").hidden = !n;
+    $("#sort-n").textContent = n ? String(n) : "";
+    if (!n) { $("#sort").innerHTML = ""; return; }
+    const cats = sorted(), goals = goalsSorted();
+    const day = ds => { const d = new Date(ds + "T12:00:00"); return `<div class="date"><b>${d.getDate()}</b>${d.toLocaleDateString("fr-FR", { month: "short" }).replace(".", "")}</div>`; };
+    const er = exps.map(e => `<div class="srow">
+      <div class="item">${day(e.date)}<div class="what"><div class="t">${esc(e.note)}</div><div class="s">Notification du ${esc(shortDay(e.created))}</div></div><div class="right"><span class="amt num">${eur(e.amount)}</span></div></div>
+      <div class="chips">${cats.map(c => `<button type="button" class="dchip" data-scat="${c.id}" data-sid="${e.id}">${esc(c.name)}</button>`).join("")}${goals.map(g => `<button type="button" class="dchip" data-sgoal="${g.id}" data-sid="${e.id}">${esc(g.name)}</button>`).join("")}<button type="button" class="dchip" data-skeep="${e.id}">Sans catégorie</button></div>
+      <div class="sacts">${/^Prélèvement/.test(e.note) ? `<button type="button" class="sbtn" data-sdeb="${e.id}">C'est un prélèvement mensuel</button>` : ""}<button type="button" class="sbtn del" data-sdel="${e.id}">Supprimer</button></div>
+    </div>`).join("");
+    const ur = unr.map(u => `<div class="srow">
+      <div class="item">${day(u.at ? ymd(new Date(u.at)) : todayYmd())}<div class="what"><div class="t">Notification non reconnue</div><p class="raw">${esc(u.text)}</p></div></div>
+      <div class="sacts"><button type="button" class="sbtn" data-uadd="${u.id}" data-ukind="out">Ajouter une dépense</button><button type="button" class="sbtn" data-uadd="${u.id}" data-ukind="in">Ajouter un crédit</button><button type="button" class="sbtn del" data-uign="${u.id}">Ignorer</button></div>
+    </div>`).join("");
+    $("#sort").innerHTML = er + ur;
   }
+  const todayYmd = () => ymd(new Date());
+  // Ranger une dépense : la même chose pour toutes les dépenses pas encore rangées chez ce commerçant.
+  function sortShop(id, patch) {
+    const x = state.expenses.find(e => e.id === id); if (!x) return;
+    const k = labelKey(x.shop || x.note), t = nowIso();
+    const same = state.expenses.filter(e => e.id === id || (needsSort(e) && labelKey(e.shop || e.note) === k));
+    for (const e of same) Object.assign(e, patch, { sorted: true, updated: t });
+    save(); render();
+    toast(`${x.shop || x.note} : ${patch.note ? patch.note : patch.cat ? catName(patch.cat) : "sans catégorie"}${same.length > 1 ? ` (${same.length} opérations)` : ""}`);
+  }
+  let fromUnread = "";
+  $("#sort").addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    const ds = b.dataset;
+    if (ds.scat) sortShop(ds.sid, { cat: ds.scat });
+    else if (ds.sgoal) { const g = state.goals.find(x => x.id === ds.sgoal); if (g) sortShop(ds.sid, { note: g.name }); }
+    else if (ds.skeep) sortShop(ds.skeep, {});
+    else if (ds.sdel) {
+      const x = state.expenses.find(e => e.id === ds.sdel); if (!x) return;
+      state.expenses = state.expenses.filter(e => e.id !== x.id); state.deleted[x.id] = nowIso(); save(); render();
+      toast(`${x.note} supprimé`, "Annuler", () => { delete state.deleted[x.id]; state.expenses.push({ ...x, updated: nowIso() }); save(); render(); });
+    } else if (ds.sdeb) {
+      // Prélèvement pas encore connu : on l'ajoute aux prélèvements mensuels et on retire la dépense (comptée désormais comme prélèvement).
+      const x = state.expenses.find(e => e.id === ds.sdeb); if (!x) return;
+      const t = nowIso(), ym = x.date.slice(0, 7), name = (x.note.replace(/^Prélèvement\s*/, "") || "Prélèvement").slice(0, 40);
+      state.debits.push({ id: "d" + uid(), name, amount: x.amount, cat: "", day: Number(x.date.slice(8, 10)), since: ym, until: "", done: { [ym]: x.created || t }, created: t, updated: t });
+      state.expenses = state.expenses.filter(e => e.id !== x.id); state.deleted[x.id] = t; save(); render();
+      toast(`${name} : ajouté aux prélèvements (${eur(x.amount)} par mois)`);
+    } else if (ds.uign) {
+      state.unread = state.unread.filter(u => u.id !== ds.uign); state.deleted[ds.uign] = nowIso(); save(); render();
+    } else if (ds.uadd) {
+      const u = state.unread.find(x => x.id === ds.uadd); if (!u) return;
+      openForm(true); setKind(ds.ukind); fromUnread = u.id;
+      const r = parseNotif(u.text);
+      $("#e-amount").value = r.amount ? String(r.amount / 100).replace(".", ",") : "";
+      $("#e-note").value = ds.ukind === "in" ? "Crédit" : "";
+      if (u.at) $("#e-date").value = ymd(new Date(u.at));
+      updateSubmit(); $("#e-amount").focus();
+    }
+  });
 
   /* ---------- Historique : toutes les opérations, du plus récent au plus ancien ---------- */
   const H_PAGE = 50;
@@ -1276,7 +1391,7 @@ if (typeof document !== "undefined") (function () {
     for (const e of state.expenses) {
       const cin = e.kind === "in";
       rows.push({ date: e.date, name: e.note || catName(e.cat), cat: state.categories.some(c => c.id === e.cat) ? catName(e.cat) : "", type: cin ? "in" : "out",
-        amount: e.amount, st: e.pending ? (cin ? "à recevoir" : "en attente") : "", stc: "", created: e.created || "" });
+        amount: e.amount, st: "", stc: "", created: e.created || "" });
     }
     // Prélèvements : un par mois, depuis leur création jusqu'à aujourd'hui (pas les mois à venir).
     for (const d of state.debits) {
@@ -1284,7 +1399,7 @@ if (typeof document !== "undefined") (function () {
       for (let ym = d.since, i = 0; ym <= end && i < 600; ym = ymShift(ym, 1), i++) {
         const dt = debitDate(d, ym);
         let st = "", stc = "";
-        if (ym === cur) { if (d.done[ym]) { st = "débité"; stc = "ok"; } else if (dt > today) { st = "à venir"; stc = "mut"; } else { st = "à valider"; } }
+        if (ym === cur) { if (d.done[ym]) { st = "passé"; stc = "ok"; } else { st = "à venir"; stc = "mut"; } }
         rows.push({ date: dt, name: d.id === SAVE_ID ? "Vers mon épargne" : d.name, cat: d.id === SAVE_ID ? "Épargne" : (state.categories.some(c => c.id === d.cat) ? catName(d.cat) : ""), type: "debit", amount: d.amount, st, stc, created: "" });
       }
     }
@@ -1474,7 +1589,6 @@ if (typeof document !== "undefined") (function () {
     document.querySelectorAll("#f-exp .kind button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.kind === k)));
     $("#e-title").textContent = k === "in" ? "Nouveau crédit" : "Nouvelle dépense";
     $("#e-note").placeholder = k === "in" ? "Ex. Remboursement" : "Ex. Nourriture";
-    $("#e-cleared-t").textContent = k === "in" ? "Déjà reçu sur mon compte" : "Déjà débité sur mon compte";
     $("#e-quick").hidden = $("#e-labels").hidden = $("#e-cat-wrap").hidden = k === "in";
     updateSubmit();
   }
@@ -1496,64 +1610,32 @@ if (typeof document !== "undefined") (function () {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { m.hidden = false; m.textContent = "Choisissez une date."; return; }
     m.hidden = true;
     const t = nowIso();
-    // Par défaut l'opération est « en attente » : elle sera validée quand elle passera vraiment sur le compte.
-    const pending = !$("#e-cleared").checked, cin = kind === "in";
+    const cin = kind === "in";
     const cat = cin ? "" : selExpCat;
-    state.expenses.push({ id: "e" + uid(), date, amount, kind, pending, cat, note, created: t, updated: t });
+    state.expenses.push({ id: "e" + uid(), date, amount, kind, pending: false, cat, note, sorted: true, created: t, updated: t });
+    if (fromUnread) { state.unread = state.unread.filter(u => u.id !== fromUnread); state.deleted[fromUnread] = t; fromUnread = ""; }
     selExpCat = "";
     save();
     const ym = date.slice(0, 7);
     if (ym !== view) view = ym;
-    $("#e-amount").value = ""; $("#e-note").value = ""; $("#e-cleared").checked = false;
-    render();
-    const T = monthTotals(state, ym), r = T.income + T.got - T.total - (ym >= todayYm() ? goalReserve(state, ym) : 0);
-    const wait = pending ? (cin ? " · à recevoir" : " · en attente de débit") : "";
-    if (cin) { toast(`${note} : +${eur(amount)}${wait} · il vous reste ${r < 0 ? "−" : ""}${eur(Math.abs(r))}`); setKind("out"); return; }
-    const cg = state.categories.find(c => c.id === cat && c.goal), cgS = cg ? (x => x.exp + x.deb)(catSpent(state, ym)[cg.id]) : 0;
-    if (!state.goals.some(g => labelKey(g.name) === labelKey(note)) && cg) { toast(`${note} : ${eur(amount)}${wait} · ${goalStatus({ name: cg.name, amount: cg.goal }, cgS)}`); return; }
-    if (pending) { const goal = state.goals.find(g => labelKey(g.name) === labelKey(note)); toast(goal ? `${note} : ${eur(amount)}${wait} · ${goalStatus(goal, goalSpent(state, ym)[goal.id])}` : `${note} : ${eur(amount)}${wait} · il vous reste ${r < 0 ? "−" : ""}${eur(Math.abs(r))}`); return; }
+    $("#e-amount").value = ""; $("#e-note").value = "";
+    openForm(false);
+    const F = funBudget(state, ym), left = `budget plaisir : ${F.left < 0 ? "−" : ""}${eur(Math.abs(F.left))}`;
+    if (cin) { setKind("out"); toast(`${note} : +${eur(amount)} · ${left}`); return; }
     const goal = state.goals.find(g => labelKey(g.name) === labelKey(note));
-    if (goal) { toast(`${note} : ${eur(amount)} · ${goalStatus(goal, goalSpent(state, ym)[goal.id])}`); return; }
-    toast(!(T.income + T.got) ? `${note} : ${eur(amount)} ajoutés` : r >= 0 ? `${note} : ${eur(amount)} · il vous reste ${eur(r)} ce mois-ci` : `${note} : ${eur(amount)} · vous êtes à −${eur(-r)} ce mois-ci`);
+    const cg = state.categories.find(c => c.id === cat && c.goal);
+    if (goal) toast(`${note} : ${eur(amount)} · ${goalStatus(goal, goalSpent(state, ym)[goal.id])}`);
+    else if (cg) toast(`${note} : ${eur(amount)} · ${goalStatus({ name: cg.name, amount: cg.goal }, (x => x.exp + x.deb)(catSpent(state, ym)[cg.id]))}`);
+    else toast(`${note} : ${eur(amount)} · ${left}`);
   });
-  /* Validation : l'opération est vraiment passée sur le compte. */
-  function clearExpense(id) {
-    const x = state.expenses.find(i => i.id === id); if (!x) return;
-    x.pending = false; x.cleared = x.updated = nowIso(); save(); render();
-    toast(`${x.note} : ${x.kind === "in" ? "+" + eur(x.amount) + " reçus" : eur(x.amount) + " débités"}`, "Annuler", () => unclearExpense(x.id, true));
+  function openForm(open) {
+    $("#f-exp").hidden = !open; $("#e-open").hidden = open;
+    if (!open) { fromUnread = ""; $("#e-msg").hidden = true; render(); return; }
+    renderForm(); $("#f-exp").scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  function unclearExpense(id, quiet) {
-    const x = state.expenses.find(i => i.id === id); if (!x) return;
-    x.pending = true; x.cleared = ""; x.updated = nowIso(); save(); render();
-    if (!quiet) toast(`${x.note || "Opération"} : de nouveau ${x.kind === "in" ? "à recevoir" : "en attente"}`, "Annuler", () => clearExpense(x.id));
-  }
-  function clearDebit(id, on) {
-    const d = state.debits.find(i => i.id === id); if (!d) return;
-    const ym = view, name = d.id === SAVE_ID ? "Épargne" : d.name;
-    const set = v => { if (v) d.done[ym] = nowIso(); else delete d.done[ym]; d.updated = nowIso(); save(); render(); };
-    set(on);
-    toast(on ? `${name} : ${eur(d.amount)} débités en ${monthName(ym).split(" ")[0]}` : `${name} : de nouveau en attente`, "Annuler", () => set(!on));
-  }
-  $("#val").addEventListener("click", e => {
-    const b = e.target.closest("button"); if (!b) return;
-    if (b.dataset.unok) unclearExpense(b.dataset.unok); else if (b.dataset.dundo) clearDebit(b.dataset.dundo, false);
-  });
-  /* Valider demande deux appuis : le 1er arme le bouton (« Confirmer ? »), le 2e valide. Sans 2e appui, il se désarme après 3 s. */
-  function confirmTap(b) {
-    if (b.dataset.armed === "1") return true;
-    const label = b.textContent;
-    document.querySelectorAll('.okbtn[data-armed="1"]').forEach(x => { x.dataset.armed = ""; x.classList.remove("armed"); x.textContent = x.dataset.label || x.textContent; });
-    b.dataset.armed = "1"; b.dataset.label = label; b.classList.add("armed"); b.textContent = "Confirmer ?";
-    setTimeout(() => { if (b.isConnected && b.dataset.armed === "1") { b.dataset.armed = ""; b.classList.remove("armed"); b.textContent = label; } }, 3000);
-    return false;
-  }
-  $("#pend").addEventListener("click", e => {
-    const b = e.target.closest("button"); if (!b) return;
-    if ((b.dataset.ok || b.dataset.dok) && !confirmTap(b)) return;
-    if (b.dataset.ok) clearExpense(b.dataset.ok); else if (b.dataset.dok) clearDebit(b.dataset.dok, true);
-  });
+  $("#e-open").addEventListener("click", () => { openForm(true); $("#e-amount").focus(); });
+  $("#e-close").addEventListener("click", () => openForm(false));
   $("#list").addEventListener("click", e => {
-    const ok = e.target.closest("[data-ok]"); if (ok) { if (confirmTap(ok)) clearExpense(ok.dataset.ok); return; }
     const b = e.target.closest("[data-x]"); if (!b) return;
     if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer"; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = "Supprimer"; } }, 3000); return; }
     const x = state.expenses.find(i => i.id === b.dataset.x);
@@ -1822,8 +1904,6 @@ if (typeof document !== "undefined") (function () {
   });
   $("#debits").addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
-    if (b.dataset.dok) { if (confirmTap(b)) clearDebit(b.dataset.dok, true); return; }
-    if (b.dataset.dundo) { clearDebit(b.dataset.dundo, false); return; }
     if (b.dataset.gosave !== undefined) { setTab("save"); svEdit = true; fillSave(); renderSavings(); $("#sv-in-month").focus(); return; }
     if (b.dataset.dedit) { editDebit = editDebit === b.dataset.dedit ? "" : b.dataset.dedit; renderDebits(); return; }
     if (b.dataset.dcancel !== undefined) { editDebit = ""; renderDebits(); return; }
@@ -1912,6 +1992,25 @@ if (typeof document !== "undefined") (function () {
     state = merged; save(); render();
     return report;
   }
+  /* Boîte de réception : fichiers « notif-<heure>-<n>.txt » déposés dans le Gist par MacroDroid,
+     un par notification de la banque. <heure> : secondes (ou millisecondes) depuis 1970. */
+  async function ghInbox(g) {
+    const names = Object.keys(g.files || {}).filter(n => n !== GIST_FILE && /^notif/i.test(n));
+    if (!names.length) return [];
+    const items = [];
+    for (const name of names) {
+      const f = g.files[name];
+      let text = f.content || "";
+      if (f.truncated) { const r = await fetch(f.raw_url, { cache: "no-store" }); if (!r.ok) continue; text = await r.text(); }
+      const m = /(\d{10,13})/.exec(name), ms = m ? Number(m[1]) * (m[1].length === 10 ? 1000 : 1) : NaN;
+      const at = new Date(Number.isFinite(ms) && ms > 1.5e12 && ms < Date.now() + 864e5 ? ms : g.updated_at || Date.now()).toISOString();
+      items.push({ id: name.replace(/\.[a-z]+$/i, "").replace(/[^\w-]/g, "").slice(0, 60), text: text.trim(), at });
+    }
+    const added = importNotifs(state, items);
+    if (added) { save(); render(); toast(`${added} opération${added > 1 ? "s" : ""} ajoutée${added > 1 ? "s" : ""} depuis vos notifications`); }
+    ghSet({ inboxAt: items.reduce((x, i) => i.at > x ? i.at : x, ghGet().inboxAt || "") });
+    return names;
+  }
   let ghBusy = null, ghTimer = null;
   function ghSync() {
     if (ghBusy) return ghBusy;
@@ -1919,16 +2018,22 @@ if (typeof document !== "undefined") (function () {
       const s = ghGet();
       if (!s.token) throw new Error("Sauvegarde automatique non activée.");
       if (!navigator.onLine) throw offlineError();
-      let report = null;
+      let report = null, done = [];
       if (s.id) {
         const r = await gh("GET", "/gists/" + s.id, s.token);
         if (r.status === 404) ghSet({ id: "", remoteAt: "" });
         else if (!r.ok) throw ghError(r);
-        else { const g = await r.json(); if (g.updated_at !== s.remoteAt) { report = await ghMerge(g); ghSet({ remoteAt: g.updated_at }); } }
+        else {
+          const g = await r.json();
+          if (g.updated_at !== s.remoteAt) { report = await ghMerge(g); ghSet({ remoteAt: g.updated_at }); }
+          done = await ghInbox(g);
+        }
       }
-      if (ghPending()) {
+      if (ghPending() || done.length) {
         const sig = dataSig(), cur = ghGet();
         const files = { [GIST_FILE]: { content: JSON.stringify(exportPayload(state), null, 1) } };
+        // Notifications lues : retirées du Gist (elles sont maintenant dans les données).
+        for (const name of done) files[name] = null;
         const r = cur.id
           ? await gh("PATCH", "/gists/" + cur.id, cur.token, { files })
           : await gh("POST", "/gists", cur.token, { description: GIST_DESC, public: false, files });
@@ -1966,6 +2071,8 @@ if (typeof document !== "undefined") (function () {
       : `Données enregistrées sur cet appareil${lbl ? ` · ${lbl}` : ""}.`;
     const s = ghGet();
     $("#gh-setup").hidden = !!s.token; $("#gh-active").hidden = !s.token; $("#gh-help").hidden = !!s.token;
+    $("#nt-on").hidden = !s.id; $("#nt-id").value = s.id || "";
+    $("#nt-hint").textContent = !s.token ? "Activez d'abord la sauvegarde automatique ci-dessus." : !s.id ? "Le Gist sera créé à la première sauvegarde." : s.inboxAt ? `Dernière notification lue le ${dfStamp.format(new Date(s.inboxAt))}.` : "Aucune notification reçue pour l'instant.";
     $("#gh-hint").textContent = s.token ? cap(lbl) + "." + (s.error ? ` ${s.error}` : "") : "";
   }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
@@ -2000,11 +2107,18 @@ if (typeof document !== "undefined") (function () {
     renderStatus(); $("#gh-hint").textContent = "Désactivée. La dernière copie reste dans votre Gist sur GitHub.";
   });
   window.addEventListener("online", () => ghSoon(1000));
+  // Notifications : lues à l'ouverture (voir en bas), puis chaque minute tant que l'appli est affichée.
+  setInterval(() => { if (ghOn() && navigator.onLine && !document.hidden) ghSoon(0); }, 60000);
   window.addEventListener("offline", renderStatus);
   document.addEventListener("visibilitychange", () => {
     if (!ghOn() || !navigator.onLine) return;
     if (document.hidden) { if (ghPending()) { clearTimeout(ghTimer); ghSync().catch(() => {}); } }
     else ghSoon(1500);
+  });
+
+  $("#nt-copy").addEventListener("click", () => {
+    const v = $("#nt-id").value; if (!v) return;
+    (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(() => toast("Identifiant copié")).catch(() => { $("#nt-id").select(); toast("Sélectionné : copiez-le"); });
   });
 
   /* ---------- Thème : automatique, clair ou sombre ---------- */
@@ -2145,6 +2259,7 @@ if (typeof document !== "undefined") (function () {
 
   $("#e-date").value = ymd(new Date());
   save(); render();
+  if (ghOn()) ghSoon(800);
 })();
 </script>
 
