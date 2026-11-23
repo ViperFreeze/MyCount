@@ -375,7 +375,7 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
       <h2>Réglages</h2>
       <div class="field"><label for="set-income">Revenus habituels par mois (€)</label><input id="set-income" inputmode="decimal" autocomplete="off" placeholder="1 200"></div>
       <div class="field"><label for="set-floor">Minimum à garder sur le compte en fin de mois (€)</label><input id="set-floor" inputmode="decimal" autocomplete="off" placeholder="0"></div>
-      <p class="rhint">Retiré du budget plaisir : ce montant reste toujours sur le compte.</p>
+      <p class="rhint">Si votre fin de mois estimée en banque passe sous ce montant, elle s'affiche en rouge sous le budget plaisir.</p>
       <p class="msg" id="set-err" hidden></p>
       <div class="row"><button type="button" class="secondary" id="set-cancel">Fermer</button><button class="primary" type="submit">Enregistrer</button></div>
 
@@ -425,13 +425,13 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
       </div>
     </form>
 
-    <div class="left-label">Il vous reste ce mois-ci</div>
+    <div class="left-label">Budget plaisir restant</div>
     <div class="big"><span class="done num" id="f-left">–</span><span class="chip" id="f-status" hidden></span></div>
     <div class="bank" id="bank-view" hidden></div>
     <form class="bank-form" id="bank-form" hidden novalidate>
       <div class="field"><label for="bank-in">Solde affiché par votre banque aujourd'hui (€)</label><input id="bank-in" inputmode="decimal" autocomplete="off" placeholder="1 234,56"></div>
       <button class="primary" type="submit">Enregistrer</button>
-      <p class="fine">Les dépenses déjà faites sont comptées comme incluses dans ce solde. Il se met à jour tout seul avec vos nouvelles dépenses et quand vous validez un prélèvement « Débité » ou un crédit « Reçu ». Mettez-le à jour de temps en temps pour vérifier qu'il ne manque rien.</p>
+      <p class="fine">Le solde sert de contrôle : le budget plaisir, lui, se calcule sur votre salaire. Les dépenses déjà faites sont comptées comme incluses dans ce solde. Il se met à jour tout seul avec vos nouvelles dépenses et quand vous validez un prélèvement « Débité » ou un crédit « Reçu ». Mettez-le à jour de temps en temps pour vérifier qu'il ne manque rien.</p>
       <div class="row"><button type="button" class="sbtn" id="bank-del" hidden>Retirer</button><button type="button" class="sbtn" id="bank-cancel">Annuler</button></div>
     </form>
     <div class="income" id="income-view"><span id="income-t"></span></div>
@@ -439,8 +439,7 @@ svg .ac{fill:var(--accent);opacity:.85} svg .ai{fill:var(--ok);opacity:.85}
       <div class="field"><label for="income-in">Vos revenus par mois (salaire, bourse, aides…)</label><input id="income-in" inputmode="decimal" placeholder="1 200"></div>
       <button class="primary" type="submit">Enregistrer</button>
     </form>
-    <div class="gauge" aria-hidden="true"><div class="fd" id="g-debit"></div><div class="f" id="g-fill"></div><div class="fr" id="g-res"></div></div>
-    <div class="glegend" aria-hidden="true"><span><i class="k-done"></i>Débité</span><span><i class="k-pend"></i>Pas encore débité</span><span id="gl-res"><i class="k-res"></i>Prévu objectifs</span></div>
+    <div class="gauge" aria-hidden="true"><div class="fd" id="g-debit"></div><div class="f" id="g-fill"></div><div class="fr" id="g-res"></div><i class="t" id="g-tick" hidden></i></div>
     <div class="scale"><span id="sc-a"></span><span id="sc-b"></span></div>
     <div class="calc" id="calc"></div>
     <form class="dform inc-month" id="inc-month" hidden novalidate>
@@ -668,7 +667,7 @@ const WalletCore = (() => {
     // bank : solde réel saisi (centimes, négatif permis en cas de découvert) et le moment de la saisie.
     const bk = d.bank && typeof d.bank === "object" ? d.bank : {};
     const bank = { amount: Number.isInteger(cents(bk.amount)) && typeof bk.at === "string" && bk.at ? cents(bk.amount) : 0, at: typeof bk.at === "string" ? bk.at : "", updated: typeof bk.updated === "string" ? bk.updated : "" };
-    // floor : minimum à garder sur le compte en fin de mois, retiré du budget plaisir.
+    // floor : minimum à garder sur le compte en fin de mois (alerte sur la ligne « En banque »).
     const fl = d.floor && typeof d.floor === "object" ? d.floor : {};
     const floor = { amount: cents(fl.amount) > 0 ? cents(fl.amount) : 0, updated: typeof fl.updated === "string" ? fl.updated : "" };
     return {
@@ -825,13 +824,41 @@ const WalletCore = (() => {
     return cat + label;
   }
 
-  return { normalize, merge, exportPayload, parseImport, monthTotals, bankEstimate, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey, incomeFor, goalReserve };
+  /* Ce que les objectifs prennent sur le salaire du mois, en plus des prélèvements.
+     Objectif par catégorie : son plafond moins les prélèvements de la catégorie (déjà comptés à part).
+     Mêmes règles que goalReserve pour ne rien compter deux fois. */
+  function goalPlan(state, ym) {
+    const cs = catSpent(state, ym), names = [];
+    let total = 0;
+    for (const c of state.categories) if (c.goal) { total += Math.max(0, c.goal - cs[c.id].deb); names.push(c.name); }
+    const goalCats = new Set(state.categories.filter(c => c.goal).map(c => c.id));
+    for (const g of state.goals) {
+      const k = labelKey(g.name);
+      const last = state.expenses.filter(e => e.kind !== "in" && labelKey(e.note) === k).sort((a, b) => b.date.localeCompare(a.date))[0];
+      if (last && goalCats.has(last.cat)) continue;
+      total += g.amount; names.push(g.name);
+    }
+    return { total, names };
+  }
+
+  /* Budget plaisir d'un mois, calculé à partir du salaire :
+     envelope = revenus + crédits reçus − prélèvements (épargne comprise) − objectifs
+     spent    = dépenses hors objectifs + dépassements des objectifs
+     left     = envelope − spent */
+  function funBudget(state, ym) {
+    const T = monthTotals(state, ym), plan = goalPlan(state, ym), reserve = goalReserve(state, ym);
+    const envelope = T.income + T.got - T.debits - plan.total;
+    const spent = T.spent + reserve - plan.total;
+    return { T, plan, reserve, envelope, spent, left: envelope - spent };
+  }
+
+  return { normalize, merge, exportPayload, parseImport, monthTotals, bankEstimate, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey, incomeFor, goalReserve, goalPlan, funBudget };
 })();
 if (typeof module !== "undefined") module.exports = WalletCore;
 
 if (typeof document !== "undefined") (function () {
   "use strict";
-  const { normalize, merge, exportPayload, parseImport, monthTotals, bankEstimate, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey, incomeFor, goalReserve } = WalletCore;
+  const { normalize, merge, exportPayload, parseImport, monthTotals, bankEstimate, activeDebits, potBalances, simulate, monthsToReach, goalSpent, catSpent, labelKey, incomeFor, goalReserve, funBudget } = WalletCore;
   const LS = "mywallet-v1";
   const $ = s => document.querySelector(s);
   const pad = n => String(n).padStart(2, "0");
@@ -926,64 +953,54 @@ if (typeof document !== "undefined") (function () {
   const catName = id => (state.categories.find(c => c.id === id) || {}).name || "Hors catégorie";
 
   function render() {
-    const T = monthTotals(state, view), tm = timing(view);
-    // Budget réel : revenus + crédits déjà reçus sur le compte − tout ce qui sort (y compris ce qui n'est pas encore débité).
-    // Un crédit en attente n'est compté qu'une fois validé « Reçu ».
-    const inTot = T.income + T.got;
-    const left = inTot - T.total;
-    // Objectifs de dépenses : la part pas encore dépensée de chaque plafond est comptée comme déjà prévue (sauf pour un mois terminé).
-    const reserve = tm.kind === "past" ? 0 : goalReserve(state, view), rem = left - reserve;
+    const tm = timing(view), F = funBudget(state, view), T = F.T;
     const mon = monthName(view).split(" ")[0];
     $("#h-month").textContent = monthName(view);
     $("#m-next").disabled = view >= ymShift(todayYm(), 1);
     $("#h-sub").textContent = tm.kind === "current" ? `Jour ${tm.elapsed} sur ${tm.dim} · ${T.count} dépense${T.count > 1 ? "s" : ""}` : tm.kind === "past" ? `Mois terminé · ${T.count} dépense${T.count > 1 ? "s" : ""}` : "Mois à venir";
 
-    // Ce qui reste = revenus − prélèvements − dépenses
-    const has = inTot > 0, fl = $("#f-left"), st = $("#f-status");
-    // Budget plaisir : avec le solde réel, ce qui restera en banque une fois passés les prélèvements du mois et les objectifs.
-    const est = tm.kind === "current" ? bankEstimate(state, todayYm()) : null, fun = est ? est.after - reserve - state.floor.amount : 0;
-    $(".left-label").textContent = est ? "Budget plaisir" : tm.kind === "past" ? `Il vous est resté en ${mon}` : tm.kind === "future" ? `Il vous restera en ${mon}` : "Il vous reste ce mois-ci";
-    const big = est ? fun : rem, shown = est || has;
-    fl.textContent = shown ? (big < 0 ? "−" : "") + eurR(Math.abs(big)) : "–";
-    fl.classList.toggle("neg", shown && big < 0);
-    const proj = Math.min(rem, tm.kind === "current" && T.spent > 0 ? inTot - T.debits - Math.round(T.spent / tm.elapsed * tm.dim) : rem);
-    const lv = est ? (fun < 0 ? "bad" : "ok") : !has ? "" : rem < 0 ? "bad" : proj < 0 ? "warn" : "ok";
-    st.hidden = !shown; st.className = "chip " + lv;
-    st.textContent = lv === "bad" ? "Dans le rouge" : lv === "warn" ? "Rythme trop élevé" : tm.kind === "future" ? "Prévision" : "Ça va";
+    /* Budget plaisir, à partir du salaire :
+       revenus + crédits reçus − prélèvements (épargne comprise) − objectifs = budget plaisir du mois,
+       puis chaque dépense hors objectifs (ou au-delà d'un objectif) le fait baisser. */
+    const inTot = T.income + T.got, has = inTot > 0, fl = $("#f-left"), st = $("#f-status");
+    const env = F.envelope, used = F.spent, fun = F.left;
+    $(".left-label").textContent = tm.kind === "past" ? `Budget plaisir restant en ${mon}` : tm.kind === "future" ? `Budget plaisir prévu en ${mon}` : "Budget plaisir restant";
+    fl.textContent = has ? (fun < 0 ? "−" : "") + eurR(Math.abs(fun)) : "–";
+    fl.classList.toggle("neg", has && fun < 0);
+    const lv = !has ? "" : fun < 0 ? "bad" : level(used, env, tm.frac);
+    st.hidden = !has; st.className = "chip " + lv;
+    st.textContent = env <= 0 ? "Pas de budget plaisir" : lv === "bad" ? "Dans le rouge" : lv === "warn" ? "Rythme trop élevé" : tm.kind === "future" ? "Prévision" : "Ça va";
     const hasInc = state.income.amount > 0 || hasOwnInc(view);
-    $("#income-t").textContent = "Indiquez vos revenus pour savoir ce qui vous reste.";
+    $("#income-t").textContent = "Indiquez votre salaire pour connaître votre budget plaisir.";
     $("#income-view").hidden = $("#income-form").hidden = hasInc;
 
-    // Jauge : déjà débité, puis en bleu ce qui n'est pas encore débité, puis ce qui est prévu pour les objectifs.
-    const base = Math.max(inTot, T.total + reserve, 1);
-    const wd = T.done / base * 100, we = T.pendOut / base * 100, wr = reserve / base * 100;
-    const gd = $("#g-debit"); gd.style.width = Math.min(100, wd) + "%";
+    // Jauge : la part du budget plaisir déjà dépensée, avec le repère du jour.
+    const pct = env > 0 ? Math.max(0, used) / env * 100 : used > 0 ? 100 : 0;
+    const gd = $("#g-debit"); gd.style.width = Math.min(100, pct) + "%";
     gd.className = "fd" + (lv === "bad" ? " bad" : lv === "warn" ? " warn" : "");
-    const gf = $("#g-fill"); gf.style.left = Math.min(100, wd) + "%"; gf.style.width = Math.max(0, Math.min(100 - wd, we)) + "%";
-    const gr = $("#g-res"); gr.style.left = Math.min(100, wd + we) + "%"; gr.style.width = Math.max(0, Math.min(100 - wd - we, wr)) + "%";
-    $("#gl-res").hidden = !reserve;
-    $("#sc-a").textContent = has ? `${nf0.format(Math.round((T.total + reserve) / inTot * 100))} % des revenus ${reserve ? "utilisés ou prévus" : "utilisés"}` : `${eurR(T.total)} sortis`;
-    $("#sc-b").textContent = has ? eurR(inTot) : "";
-    // Ce qui reste = revenus + crédits reçus − ce qui est déjà débité − ce qui va encore partir (prélèvements à venir, dépenses en attente).
-    const pendDeb = activeDebits(state, view).filter(d => !d.done[view] && view >= todayYm()).reduce((s, d) => s + d.amount, 0), pendExp = T.pendOut - pendDeb;
-    const waitSub = [pendDeb ? `${eur(pendDeb)} de prélèvements` : "", pendExp ? `${eur(pendExp)} de dépenses en attente` : ""].filter(Boolean).join(" + ");
+    $("#g-fill").style.width = "0"; $("#g-res").style.width = "0";
+    $("#g-tick").hidden = tm.kind !== "current"; $("#g-tick").style.left = (tm.frac * 100).toFixed(1) + "%";
+    $("#sc-a").textContent = has ? `${eurR(Math.max(0, used))} dépensés sur ${eurR(Math.max(0, env))}` : "";
+    $("#sc-b").textContent = has && tm.kind === "current" && fun > 0 ? `≈ ${eurR(Math.floor(fun / tm.daysLeft))} par jour` : "";
+
+    // Détail : du salaire au budget plaisir.
+    const pendDeb = activeDebits(state, view).filter(d => !d.done[view] && view >= todayYm()).reduce((s, d) => s + d.amount, 0);
+    const sd = saveDebit(), saveAmt = sd && saveActive(sd, view) ? sd.amount : 0;
+    const pendExp = T.pendOut - pendDeb;
     const line = (label, v, cls, sub, extra) => `<div class="cl${cls === "tot" ? " tot" : ""}"><span>${label}${sub ? `<small>${sub}</small>` : ""}</span>${extra || ""}<span class="v ${cls === "tot" ? "" : cls || ""}">${v}</span></div>`;
     const sgn = c => (c < 0 ? "−" : "") + eur(Math.abs(c));
-    if (est) $("#calc").innerHTML =
-      line("Solde en banque", sgn(est.now), "", `saisi le ${new Date(est.at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}, mis à jour avec vos nouvelles dépenses`, `<button type="button" class="sbtn" id="bank-edit">Modifier</button>`) +
-      (est.pendOut ? line("Prélèvements à venir", "−" + eur(est.pendOut), "wait", "pas encore validés « Débité » ce mois-ci") : "") +
-      (est.pendIn ? line("Crédits à recevoir", "+" + eur(est.pendIn), "in") : "") +
-      (reserve ? line("Prévu pour vos objectifs", "−" + eur(reserve), "res", "ce qui reste à dépenser sur vos plafonds du mois") : "") +
-      (state.floor.amount ? line("Minimum à garder", "−" + eur(state.floor.amount), "", "en fin de mois, réglable dans les réglages") : "") +
-      line("Budget plaisir", sgn(fun), "tot");
-    else $("#calc").innerHTML =
-      line("Revenus du mois", eur(T.income), "", hasOwnInc(view) ? "montant propre à ce mois" : "", `<button type="button" class="sbtn" id="income-edit">Modifier</button>`) +
-      (T.credits ? line("Crédits reçus", (T.got ? "+" : "") + eur(T.got), "in", T.pendIn ? `${eur(T.pendIn)} à recevoir, pas encore compté` : "") : "") +
-      line("Déjà débité", (T.done ? "−" : "") + eur(T.done)) +
-      (T.pendOut || tm.kind !== "past" ? line(tm.kind === "past" ? "Pas encore validé" : "À venir", (T.pendOut ? "−" : "") + eur(T.pendOut), T.pendOut ? "wait" : "", waitSub) : "") +
-      (reserve ? line("Prévu pour vos objectifs", "−" + eur(reserve), "res", "ce qui reste à dépenser sur vos plafonds du mois") : "") +
-      line(tm.kind === "past" ? "Il vous est resté" : "Il vous reste", (rem < 0 ? "−" : "") + eur(Math.abs(rem)), "tot");
-    const showCalc = !!est || has || state.income.amount > 0 || hasOwnInc(view);
+    const minus = c => (c ? "−" : "") + eur(c);
+    const goalNames = F.plan.names.slice(0, 3).join(", ") + (F.plan.names.length > 3 ? "…" : "");
+    $("#calc").innerHTML =
+      line("Salaire du mois", eur(T.income), "", hasOwnInc(view) ? "montant propre à ce mois" : "", `<button type="button" class="sbtn" id="income-edit">Modifier</button>`) +
+      (T.credits ? line("Crédits reçus", (T.got ? "+" : "") + eur(T.got), "in", T.pendIn ? `${eur(T.pendIn)} à recevoir, compté une fois « Reçu »` : "") : "") +
+      line("Prélèvements", minus(T.debits), "", [saveAmt ? `dont ${eur(saveAmt)} d'épargne` : "", pendDeb ? `${eur(pendDeb)} pas encore débités` : ""].filter(Boolean).join(" · ")) +
+      (F.plan.total ? line("Objectifs de dépenses", "−" + eur(F.plan.total), "res", goalNames) : "") +
+      line("Budget plaisir du mois", sgn(env), "tot") +
+      line("Dépenses plaisir", minus(Math.max(0, used)), pendExp ? "wait" : "", "hors objectifs, dépassements compris" + (pendExp ? ` · ${eur(pendExp)} en attente` : "")) +
+      (tm.kind === "past" && F.reserve ? line("Non dépensé sur les objectifs", "+" + eur(F.reserve), "in") : "") +
+      line(tm.kind === "past" ? (F.reserve ? "Il vous est resté au total" : "Budget plaisir restant") : "Budget plaisir restant", sgn(tm.kind === "past" ? fun + F.reserve : fun), "tot");
+    const showCalc = has || state.income.amount > 0 || hasOwnInc(view);
     $("#calc").hidden = !showCalc;
     if (!showCalc) $("#inc-month").hidden = true;
 
@@ -1733,12 +1750,17 @@ if (typeof document !== "undefined") (function () {
     openIncMonth(false); save(); render(); toast(`Revenus de ${monthName(view)} : montant habituel`);
   });
   $("#im-cancel").addEventListener("click", () => openIncMonth(false));
-  /* ---------- Solde réel en banque (affiché en petit sous « Il vous reste ») ---------- */
+  /* ---------- Solde réel en banque (contrôle, affiché en petit sous le budget plaisir) ---------- */
   /* Petit lien sous le grand chiffre, seulement tant qu'aucun solde n'est saisi. Ensuite le solde se modifie dans le détail. */
   function renderBank(tm) {
-    const v = $("#bank-view");
-    v.hidden = tm.kind !== "current" || !$("#bank-form").hidden || !!bankEstimate(state, todayYm());
-    if (!v.hidden) v.innerHTML = `<button type="button" class="linkbtn" id="bank-edit">+ Indiquer mon solde en banque pour voir votre budget plaisir</button>`;
+    const v = $("#bank-view"), est = bankEstimate(state, todayYm());
+    v.hidden = tm.kind !== "current" || !$("#bank-form").hidden;
+    if (v.hidden) return;
+    if (!est) { v.innerHTML = `<button type="button" class="linkbtn" id="bank-edit">+ Indiquer mon solde en banque pour vérifier</button>`; return; }
+    // Contrôle : ce qui restera vraiment sur le compte une fois passés les prélèvements et les objectifs du mois.
+    const marge = est.after - goalReserve(state, todayYm()), low = state.floor.amount && marge < state.floor.amount;
+    const sg = c => (c < 0 ? "−" : "") + eur(Math.abs(c));
+    v.innerHTML = `<span>En banque : <b class="num">${sg(est.now)}</b> · fin de mois estimée : <b class="num${marge < 0 || low ? " neg" : ""}">${sg(marge)}</b>${low ? ` <small>(sous votre minimum de ${eur(state.floor.amount)})</small>` : ""}</span> <button type="button" class="sbtn" id="bank-edit">Modifier</button>`;
   }
   const parseSigned = s => {
     const t = String(s).replace(/[\s\u00a0\u202f€]/g, "").replace("−", "-").replace(",", ".");
